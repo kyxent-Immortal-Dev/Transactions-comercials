@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model categories {
+  id            Int             @id @default(autoincrement())
+  name          String?         @db.VarChar(100)
+  description   String?
+  subcategories subcategories[]
+}
+
+model products {
+  id              Int            @id @default(autoincrement())
+  name            String?        @db.VarChar(50)
+  price           Float?
+  description     String?
+  image           String?
+  amount          Int?
+  subcategoriesid Int?
+  subcategories   subcategories? @relation(fields: [subcategoriesid], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model subcategories {
+  id          Int         @id @default(autoincrement())
+  name        String?     @db.VarChar(100)
+  description String?
+  categoryid  Int?
+  products    products[]
+  categories  categories? @relation(fields: [categoryid], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
