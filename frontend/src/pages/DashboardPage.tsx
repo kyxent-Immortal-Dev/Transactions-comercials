@@ -1,7 +1,7 @@
 export const DashboardPage = () => {
   return (
     <>
-      <div className="grid grid-cols-1 pt-10 m-20 pb-200">
+      <div className="grid grid-cols-1 pt-10 m-20 pb-200 bg-white rounded-lg">
         <div className="carousel rounded-box">
           <div className="carousel-item">
             <img

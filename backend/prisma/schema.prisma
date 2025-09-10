@@ -1,29 +1,21 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
+  output = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url = env("DATABASE_URL")
 }
 
+// ===== ESTRUCTURA BASE=====
 model categories {
   id            Int             @id @default(autoincrement())
   name          String?         @db.VarChar(100)
   description   String?
   subcategories subcategories[]
-}
-
-model products {
-  id              Int            @id @default(autoincrement())
-  name            String?        @db.VarChar(50)
-  price           Float?
-  description     String?
-  image           String?
-  amount          Int?
-  subcategoriesid Int?
-  subcategories   subcategories? @relation(fields: [subcategoriesid], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  
+  @@map("categories")
 }
 
 model subcategories {
@@ -32,5 +24,191 @@ model subcategories {
   description String?
   categoryid  Int?
   products    products[]
-  categories  categories? @relation(fields: [categoryid], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  categories  categories? @relation(fields: [categoryid], references: [id], onDelete: Cascade)
+  
+  @@map("subcategories")
+}
+
+model products {
+  id              Int            @id @default(autoincrement())
+  uuid            String?        @db.VarChar(50)  // Nuevo campo del schema del profesor
+  code            String?        @db.VarChar(50)  // Código del producto
+  name            String?        @db.VarChar(100)
+  size            String?        @db.VarChar(50)  // Tamaño del producto
+  description     String?
+  presentation    String?        // Presentación del producto
+  price           Float?
+  image           String?
+  amount          Int?           // Stock actual
+  purchase_unit   String?        @db.VarChar(20)  // Unidad de compra
+  sale_unit       String?        @db.VarChar(20)  // Unidad de venta
+  subcategoriesid Int?
+  created_at      DateTime       @default(now())
+  modified_at     DateTime       @updatedAt
+  created_by      String?        @db.VarChar(100)
+  modified_by     String?        @db.VarChar(100)
+  
+  // Relaciones
+  subcategories   subcategories? @relation(fields: [subcategoriesid], references: [id], onDelete: Cascade)
+  quote_details   quote_details[]
+  buy_order_details buy_order_details[]
+  
+  @@map("products")
+}
+
+// ===== USUARIOS ( MEJORADOS) =====
+model accounts {
+  id       Int     @id @default(autoincrement())
+  name     String? @db.VarChar(100)
+  lastname String? @db.VarChar(100)
+  email    String?
+  password String?
+  image    String?
+  
+  @@map("accounts")
+}
+
+model suppliers {
+  id         Int       @id @default(autoincrement())
+  name       String?   @db.VarChar(100)
+  country    String?   @db.VarChar(100)  // Nuevo campo
+  address    String?
+  phone      String?   @db.VarChar(20)
+  email      String?
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  
+  // Relaciones
+  supplier_contacts supplier_contacts[]
+  quotes           quotes[]
+  buy_orders       buy_orders[]
+  
+  @@map("suppliers")
+}
+
+// ===== NUEVOS MODELOS PARA EL SISTEMA DE COMPRAS =====
+
+// Contactos de proveedores
+model supplier_contacts {
+  id          Int      @id @default(autoincrement())
+  supplier_id Int
+  name        String?  @db.VarChar(100)
+  lastname    String?  @db.VarChar(100)
+  phone       String?  @db.VarChar(20)
+  email       String?
+  
+  // Relaciones
+  supplier    suppliers @relation(fields: [supplier_id], references: [id], onDelete: Cascade)
+  
+  @@map("supplier_contacts")
+}
+
+// Unidades de medida
+model units {
+  id   Int     @id @default(autoincrement())
+  name String? @db.VarChar(50)
+  type String? @db.VarChar(50) // peso, volumen, cantidad, etc.
+  
+  @@map("units")
+}
+
+// Cotizaciones
+model quotes {
+  id          Int      @id @default(autoincrement())
+  supplier_id Int
+  date        DateTime @default(now())
+  code        String?  @db.VarChar(50)
+  status      String?  @db.VarChar(20) @default("pending") // pending, approved, rejected
+  
+  // Relaciones
+  supplier      suppliers       @relation(fields: [supplier_id], references: [id])
+  quote_details quote_details[]
+  buy_orders    buy_orders[]    // Una cotización puede generar múltiples órdenes
+  
+  @@map("quotes")
+}
+
+// Detalles de cotización
+model quote_details {
+  id               Int     @id @default(autoincrement())
+  quote_id         Int
+  product_id       Int
+  quantity_req     Int?    // Cantidad solicitada
+  price            Float?  // Precio cotizado
+  unit             String? @db.VarChar(20)
+  quantity_approved Int?   // Cantidad aprobada
+  status           String? @db.VarChar(20) @default("pending") // pending, approved, rejected
+  
+  // Relaciones
+  quote   quotes   @relation(fields: [quote_id], references: [id], onDelete: Cascade)
+  product products @relation(fields: [product_id], references: [id])
+  
+  @@map("quote_details")
+}
+
+// Órdenes de compra
+model buy_orders {
+  id           Int      @id @default(autoincrement())
+  supplier_id  Int
+  quote_id     Int?     // Puede venir de una cotización o ser directa
+  date         DateTime @default(now())
+  code         String?  @db.VarChar(50)
+  status       String?  @db.VarChar(20) @default("pending") // pending, confirmed, received, cancelled
+  date_arrival DateTime? // Fecha estimada de llegada
+  
+  // Relaciones
+  supplier            suppliers           @relation(fields: [supplier_id], references: [id])
+  quote              quotes?             @relation(fields: [quote_id], references: [id])
+  buy_order_details  buy_order_details[]
+  
+  @@map("buy_orders")
+}
+
+// Detalles de orden de compra
+model buy_order_details {
+  id            Int     @id @default(autoincrement())
+  buy_order_id  Int
+  product_id    Int
+  quantity      Int?    // Cantidad ordenada
+  price         Float?  // Precio acordado
+  unit          String? @db.VarChar(20)
+  status        String? @db.VarChar(20) @default("pending") // pending, received, cancelled
+  
+  // Relaciones
+  buy_order buy_orders @relation(fields: [buy_order_id], references: [id], onDelete: Cascade)
+  product   products   @relation(fields: [product_id], references: [id])
+  
+  @@map("buy_order_details")
+}
+
+// Mantén tus modelos existentes
+model vendors {
+  id          Int      @id @default(autoincrement())
+  name        String?  @db.VarChar(100)
+  lastname    String?  @db.VarChar(100)
+  email       String?
+  phone       String?  @db.VarChar(20)
+  address     String?
+  commission  Float?   @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("vendors")
+}
+
+model clients {
+  id        Int      @id @default(autoincrement())
+  name      String?  @db.VarChar(100)
+  lastname  String?  @db.VarChar(100)
+  email     String?
+  phone     String?  @db.VarChar(20)
+  address   String?
+  company   String?  @db.VarChar(100)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("clients")
 }

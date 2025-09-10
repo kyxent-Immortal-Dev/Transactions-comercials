@@ -1,89 +1,65 @@
+import { useAuthStore } from "../../store/Auth.service";
+import { LogOut, User, Settings } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { SidebarComponent } from "./SidebarComponent";
-import { ModalComponent } from "../ModalComponent";
-import { useState } from "react";
 
 export const Header = () => {
-  const userInfo = {
-    name: "Ezequiel Campos",
-    email: "humberto@gmail.com",
-    profileImage: "https://avatars.githubusercontent.com/u/209260967?v=4",
-  };
+  const { user, logout } = useAuthStore();
+  const navigate = useNavigate();
 
-  const [open, setOpen] = useState(false);
-
-  const handleCloseModal = () => {
-    setOpen(false);
-  };
-  const handleOpenModal = () => {
-    setOpen(true);
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
   };
 
   return (
-    <>
-      <div className="navbar bg-base-100 shadow-sm">
-        <ModalComponent
-          onClose={handleCloseModal}
-          open={open}
-          title="Profile"
-          content={
-            <>
-              <div className="grid grid-cols-1">
-                {
-                  <div className="grid justify-center m-4">
-                    <img
-                      className="rounded-full w-60 m-4"
-                      src={userInfo.profileImage}
-                      alt={userInfo.name}
-                    />
-                    <p className="m-4">{userInfo.name}</p>
-                    <p className="m-4">{userInfo.email}</p>
-                  </div>
-                }
+    <header className="bg-white shadow-sm border-b border-gray-200">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16">
+          {/* Left side - Sidebar and Logo */}
+          <div className="flex items-center space-x-4">
+            {/* Sidebar Component */}
+            <SidebarComponent />
+            
+            {/* Logo/Brand */}
+            <h1 className="text-xl font-bold text-gray-900">
+              Inventario
+            </h1>
+          </div>
+
+          {/* Right side - User Menu */}
+          <div className="flex items-center space-x-4">
+            {/* User Info */}
+            <div className="flex items-center space-x-3">
+              <div className="h-8 w-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                <User className="h-4 w-4 text-white" />
               </div>
-            </>
-          }
-        />
-        <div className="flex-1">
-          <SidebarComponent />
-        </div>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="Search"
-            className="input input-bordered w-24 md:w-auto"
-          />
-          <div className="dropdown dropdown-end">
-            <div
-              tabIndex={0}
-              role="button"
-              className="btn btn-ghost btn-circle avatar"
-            >
-              <div className="w-10 rounded-full">
-                <img
-                  alt="Ezequiel campos"
-                  src="https://avatars.githubusercontent.com/u/209260967?v=4"
-                />
+              <div className="hidden md:block">
+                <p className="text-sm font-medium text-gray-900">
+                  {user?.name || user?.email || "Usuario"}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {user?.role || "Usuario"}
+                </p>
               </div>
             </div>
-            <ul
-              tabIndex={0}
-              className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow"
+
+            {/* Settings Button */}
+            <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors duration-200">
+              <Settings className="h-5 w-5" />
+            </button>
+
+            {/* Logout Button */}
+            <button
+              onClick={handleLogout}
+              className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors duration-200"
             >
-              <li>
-                <a className="justify-between" onClick={handleOpenModal}>
-                  Profile
-                </a>
-              </li>
-              <li>
-                <a>Settings</a>
-              </li>
-              <li>
-                <a>Logout</a>
-              </li>
-            </ul>
+              <LogOut className="h-4 w-4" />
+              <span className="hidden md:block">Cerrar sesión</span>
+            </button>
           </div>
         </div>
       </div>
-    </>
+    </header>
   );
 };

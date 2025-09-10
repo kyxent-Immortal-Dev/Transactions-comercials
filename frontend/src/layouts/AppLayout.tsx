@@ -7,7 +7,9 @@ export const AppLayout = () => {
     <>
       <Header />
 
-      <Outlet />
+       <div className="p-4 bg-white ">
+        <Outlet />
+      </div>
 
       <Footer />
     </>
