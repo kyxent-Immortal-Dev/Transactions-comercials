@@ -1,5 +1,5 @@
 import { HttpClient } from "../http.client.service";
-import { Quote, QuoteDetail, CreateQuoteRequest, UpdateQuoteRequest, CreateQuoteDetailRequest, UpdateQuoteDetailRequest } from "../../interfaces/Quote.interface";
+import type { Quote, QuoteDetail, CreateQuoteRequest, UpdateQuoteRequest, CreateQuoteDetailRequest, UpdateQuoteDetailRequest } from "../../interfaces/Quote.interface";
 
 export class QuoteService {
   private client: typeof HttpClient;

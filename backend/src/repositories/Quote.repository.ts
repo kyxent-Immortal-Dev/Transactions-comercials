@@ -1,6 +1,6 @@
 import { PrismaClient } from '../generated/prisma';
-import { QuoteRepositoryInterface } from '../interfaces/QuoteRepository.interface';
-import { Quote, QuoteDetail, CreateQuoteRequest, UpdateQuoteRequest, CreateQuoteDetailRequest, UpdateQuoteDetailRequest } from '../interfaces/Quote.interface';
+import type { QuoteRepositoryInterface } from '../interfaces/QuoteRepository.interface';
+import type { Quote, QuoteDetail, CreateQuoteRequest, UpdateQuoteRequest, CreateQuoteDetailRequest, UpdateQuoteDetailRequest } from '../interfaces/Quote.interface';
 
 export class QuoteRepositoryImpl implements QuoteRepositoryInterface {
   private prisma: PrismaClient;
@@ -20,7 +20,7 @@ export class QuoteRepositoryImpl implements QuoteRepositoryInterface {
         }
       },
       orderBy: { date: 'desc' }
-    });
+    }) as unknown as Quote[];
   }
 
   async findById(id: number): Promise<Quote | null> {
@@ -34,7 +34,7 @@ export class QuoteRepositoryImpl implements QuoteRepositoryInterface {
           }
         }
       }
-    });
+    }) as unknown as Quote | null;
   }
 
   async findBySupplierId(supplierId: number): Promise<Quote[]> {
@@ -49,10 +49,40 @@ export class QuoteRepositoryImpl implements QuoteRepositoryInterface {
         }
       },
       orderBy: { date: 'desc' }
-    });
+    }) as unknown as Quote[];
   }
 
   async create(quote: CreateQuoteRequest): Promise<Quote> {
+    if (!quote.code || quote.code.trim() === '') {
+      const created = await this.prisma.quotes.create({
+        data: {
+          supplier_id: quote.supplier_id,
+          status: quote.status || 'pending',
+        },
+        include: {
+          supplier: true,
+          quote_details: { include: { product: true } }
+        }
+      });
+
+      const now = new Date();
+      const year = now.getFullYear().toString().slice(-2);
+      const month = (now.getMonth() + 1).toString().padStart(2, '0');
+      const paddedId = created.id.toString().padStart(4, '0');
+      const generatedCode = `COT-${year}${month}-${paddedId}`;
+
+      const updated = await this.prisma.quotes.update({
+        where: { id: created.id },
+        data: { code: generatedCode },
+        include: {
+          supplier: true,
+          quote_details: { include: { product: true } }
+        }
+      });
+
+  return updated as unknown as Quote;
+    }
+
     return await this.prisma.quotes.create({
       data: quote,
       include: {
@@ -63,7 +93,7 @@ export class QuoteRepositoryImpl implements QuoteRepositoryInterface {
           }
         }
       }
-    });
+    }) as unknown as Quote;
   }
 
   async update(id: number, quote: UpdateQuoteRequest): Promise<Quote | null> {
@@ -79,7 +109,7 @@ export class QuoteRepositoryImpl implements QuoteRepositoryInterface {
             }
           }
         }
-      });
+      }) as unknown as Quote;
     } catch (error) {
       return null;
     }
@@ -96,14 +126,13 @@ export class QuoteRepositoryImpl implements QuoteRepositoryInterface {
     }
   }
 
-  // Quote Details methods
   async createDetail(detail: CreateQuoteDetailRequest): Promise<QuoteDetail> {
     return await this.prisma.quote_details.create({
       data: detail,
       include: {
         product: true
       }
-    });
+    }) as unknown as QuoteDetail;
   }
 
   async findDetailsByQuoteId(quoteId: number): Promise<QuoteDetail[]> {
@@ -112,7 +141,7 @@ export class QuoteRepositoryImpl implements QuoteRepositoryInterface {
       include: {
         product: true
       }
-    });
+    }) as unknown as QuoteDetail[];
   }
 
   async findDetailById(id: number): Promise<QuoteDetail | null> {
@@ -121,7 +150,7 @@ export class QuoteRepositoryImpl implements QuoteRepositoryInterface {
       include: {
         product: true
       }
-    });
+    }) as unknown as QuoteDetail | null;
   }
 
   async updateDetail(id: number, detail: UpdateQuoteDetailRequest): Promise<QuoteDetail | null> {
@@ -132,7 +161,7 @@ export class QuoteRepositoryImpl implements QuoteRepositoryInterface {
         include: {
           product: true
         }
-      });
+      }) as unknown as QuoteDetail;
     } catch (error) {
       return null;
     }

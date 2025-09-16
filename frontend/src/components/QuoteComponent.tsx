@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { Plus, Edit, Trash2, Eye, Minus, X, Package, FileText, User } from "lucide-react";
 import { useQuoteService } from "../hooks/useQuote.service";
@@ -7,7 +7,7 @@ import { useProductService } from "../hooks/useProduct.service";
 import { useAlertsService } from "../hooks/useAlerts.service";
 import { ModalComponent } from "./ModalComponent";
 
-import { Quote, QuoteDetail, CreateQuoteRequest, UpdateQuoteRequest } from "../interfaces/Quote.interface";
+import type { Quote, QuoteDetail, CreateQuoteRequest } from "../interfaces/Quote.interface";
 
 // Interface específica para el formulario
 interface QuoteFormData {
@@ -141,6 +141,14 @@ export const QuoteComponent = () => {
         return;
       }
 
+      // Validar que no existan productos duplicados en el formulario
+      const productIds = validDetails.map(d => parseInt(d.product_id, 10));
+      const hasDuplicates = new Set(productIds).size !== productIds.length;
+      if (hasDuplicates) {
+        showAlert("Error", "dark", "error", "Hay productos repetidos en la cotización. Elimine duplicados antes de guardar.");
+        return;
+      }
+
       // Preparar datos para crear la cotización
       const quoteData: CreateQuoteRequest = {
         supplier_id: parseInt(data.supplier_id, 10),
@@ -151,29 +159,74 @@ export const QuoteComponent = () => {
       console.log('Sending quote data:', quoteData); // Debug
 
       if (isEditing && selectedQuoteId) {
-        // Actualizar cotización existente
         await update(selectedQuoteId, {
           supplier_id: quoteData.supplier_id,
           code: quoteData.code,
           status: quoteData.status
         });
 
-        // Crear nuevos detalles
-        for (const detail of validDetails) {
-          try {
-            await createDetail({
-              quote_id: selectedQuoteId,
-              product_id: parseInt(detail.product_id, 10),
-              quantity_req: detail.quantity_req,
-              unit: detail.unit.trim(),
-              status: "pending"
-            });
-          } catch (detailError) {
-            console.warn('Error creating detail:', detailError);
+        const existingDetails = await getDetailsByQuoteId(selectedQuoteId);
+
+        const existingByProduct = new Map<number, QuoteDetail[]>();
+        for (const det of existingDetails) {
+          const arr = existingByProduct.get(det.product_id) || [];
+          arr.push(det);
+          existingByProduct.set(det.product_id, arr);
+        }
+
+        for (const [prodId, arr] of existingByProduct.entries()) {
+          if (arr.length > 1) {
+            const [, ...dups] = arr;
+            for (const dup of dups) {
+              if (dup.id) {
+                await deleteQuoteDetail(dup.id, selectedQuoteId);
+              }
+            }
+            existingByProduct.set(prodId, [arr[0]]);
           }
         }
 
-        showAlert("Éxito", "dark", "success", "Cotización actualizada correctamente");
+        const desiredSet = new Set(productIds);
+        const existingSet = new Set(Array.from(existingByProduct.keys()));
+
+        for (const prodId of existingSet) {
+          if (!desiredSet.has(prodId)) {
+            const detArr = existingByProduct.get(prodId)!;
+            const det = detArr[0];
+            if (det.id) {
+              await deleteQuoteDetail(det.id, selectedQuoteId);
+            }
+          }
+        }
+
+        for (const formDet of validDetails) {
+          const prodId = parseInt(formDet.product_id, 10);
+          const existing = existingByProduct.get(prodId)?.[0];
+          if (existing && existing.id) {
+            const needsUpdate = (existing.quantity_req || 0) !== formDet.quantity_req || (existing.unit || "").trim() !== formDet.unit.trim();
+            if (needsUpdate) {
+              await updateDetail(existing.id, {
+                quantity_req: formDet.quantity_req,
+                unit: formDet.unit.trim()
+              }, selectedQuoteId);
+            }
+          }
+        }
+
+        for (const formDet of validDetails) {
+          const prodId = parseInt(formDet.product_id, 10);
+          if (!existingByProduct.has(prodId)) {
+            await createDetail({
+              quote_id: selectedQuoteId,
+              product_id: prodId,
+              quantity_req: formDet.quantity_req,
+              unit: formDet.unit.trim(),
+              status: "pending"
+            });
+          }
+        }
+
+        showAlert("Éxito", "dark", "success", "Cotización actualizada y detalles sincronizados correctamente");
       } else {
         // Crear nueva cotización
         const newQuote = await create(quoteData);
@@ -343,16 +396,20 @@ export const QuoteComponent = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Código de Cotización *
+                  Código de Cotización {isEditing ? <span className="text-xs text-gray-500">(editable)</span> : <span className="text-xs text-gray-400">(se generará automáticamente)</span>}
                 </label>
                 <input
                   {...register("code", { 
-                    required: "El código es requerido",
-                    minLength: { value: 1, message: "El código no puede estar vacío" }
+                    validate: value => {
+                      if (!isEditing) return true; 
+                      if (isEditing && (!value || value.trim() === '')) return 'El código no puede estar vacío';
+                      return true;
+                    }
                   })}
                   type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="COT-001"
+                  disabled={!isEditing}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${!isEditing ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                  placeholder={isEditing ? 'Ej: COT-2509-0007' : 'Se generará automáticamente al guardar'}
                 />
                 {errors.code && (
                   <p className="mt-1 text-sm text-red-600">{errors.code.message}</p>
