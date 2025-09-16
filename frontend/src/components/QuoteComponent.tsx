@@ -1,383 +1,480 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useForm, useFieldArray } from "react-hook-form";
+import { Plus, Edit, Trash2, Eye, Minus, X, Package, FileText, User } from "lucide-react";
 import { useQuoteService } from "../hooks/useQuote.service";
 import { useSupplierService } from "../hooks/useSupplier.service";
-import { ModalComponent } from "./ModalComponent";
-import { useForm } from "react-hook-form";
-import { Quote, CreateQuoteRequest, UpdateQuoteRequest } from "../interfaces/Quote.interface";
-import { Plus, Edit, Trash2, FileText, Search, Filter, Calendar, CheckCircle, Clock, XCircle } from "lucide-react";
+import { useProductService } from "../hooks/useProduct.service";
 import { useAlertsService } from "../hooks/useAlerts.service";
+import { ModalComponent } from "./ModalComponent";
+
+import { Quote, QuoteDetail, CreateQuoteRequest, UpdateQuoteRequest } from "../interfaces/Quote.interface";
+
+// Interface específica para el formulario
+interface QuoteFormData {
+  supplier_id: string; 
+  code: string;
+  status: string;
+  quote_details: {
+    product_id: string; 
+    quantity_req: number;
+    unit: string;
+  }[];
+}
 
 export const QuoteComponent = () => {
-  const { quotes, create, update, deleteQuote, loading, getBySupplierId } = useQuoteService();
+  const { quotes, create, update, deleteQuote, getDetailsByQuoteId, createDetail, updateDetail, deleteQuoteDetail } = useQuoteService();
   const { suppliers } = useSupplierService();
+  const { products } = useProductService();
   const { showAlert } = useAlertsService();
 
-  const [open, setOpen] = useState(false);
+  const [openModal, setOpenModal] = useState(false);
+  const [openDetailModal, setOpenDetailModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [editingQuoteId, setEditingQuoteId] = useState<number | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(null);
-  const [selectedStatus, setSelectedStatus] = useState<string>("");
+  const [selectedQuoteId, setSelectedQuoteId] = useState<number | null>(null);
+  const [quoteDetails, setQuoteDetails] = useState<QuoteDetail[]>([]);
 
   const {
-    handleSubmit,
     register,
+    handleSubmit,
     reset,
-    formState: { errors, isSubmitting },
+    control,
     setValue,
-  } = useForm<CreateQuoteRequest>({
+    watch,
+    formState: { errors, isSubmitting }
+  } = useForm<QuoteFormData>({
     defaultValues: {
-      supplier_id: 0,
+      supplier_id: "",
       code: "",
       status: "pending",
-    },
+      quote_details: [{ product_id: "", quantity_req: 1, unit: "unidad" }]
+    }
   });
 
-  const handleEditQuote = (item: Quote) => {
-    setIsEditing(true);
-    setEditingQuoteId(item.id || null);
-    setValue("supplier_id", item.supplier_id);
-    setValue("code", item.code || "");
-    setValue("status", item.status || "pending");
-    setOpen(true);
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "quote_details"
+  });
+
+  // Obtener el proveedor seleccionado para mostrar su nombre
+  const getSupplierName = (supplierId: number) => {
+    const supplier = suppliers.find(s => s.id === supplierId);
+    return supplier?.name || "Proveedor no encontrado";
+  };
+
+  // Obtener el producto seleccionado para mostrar su nombre
+  const getProductName = (productId: number) => {
+    const product = products.find(p => p.id === productId);
+    return product?.name || "Producto no encontrado";
   };
 
   const handleCreateNew = () => {
     setIsEditing(false);
-    reset();
-    setOpen(true);
+    reset({
+      supplier_id: "",
+      code: "",
+      status: "pending",
+      quote_details: [{ product_id: "", quantity_req: 1, unit: "unidad" }]
+    });
+    setOpenModal(true);
+  };
+
+  const handleEdit = (quote: Quote) => {
+    setIsEditing(true);
+    setValue("supplier_id", quote.supplier_id.toString());
+    setValue("code", quote.code || "");
+    setValue("status", quote.status || "pending");
+    
+    // Si la cotización tiene detalles, los cargamos
+    if (quote.quote_details && quote.quote_details.length > 0) {
+      setValue("quote_details", quote.quote_details.map((detail: QuoteDetail) => ({
+        product_id: detail.product_id.toString(),
+        quantity_req: detail.quantity_req || 1,
+        unit: detail.unit || "unidad"
+      })));
+    } else {
+      setValue("quote_details", [{ product_id: "", quantity_req: 1, unit: "unidad" }]);
+    }
+    
+    setSelectedQuoteId(quote.id!);
+    setOpenModal(true);
   };
 
   const handleCloseModal = () => {
-    setOpen(false);
+    setOpenModal(false);
     setIsEditing(false);
+    setSelectedQuoteId(null);
     reset();
   };
 
-  const handleSubmitQuote = async (data: CreateQuoteRequest) => {
+  const handleViewDetails = async (quoteId: number) => {
     try {
-      if (isEditing && editingQuoteId) {
-        await update(editingQuoteId, data);
-        showAlert(
-          "Cotización Actualizada",
-          "dark",
-          "success",
-          "¡Cotización actualizada exitosamente!"
-        );
-      } else {
-        await create(data);
-        showAlert(
-          "Cotización Creada",
-          "dark",
-          "success",
-          "¡Cotización creada exitosamente!"
-        );
+      const details = await getDetailsByQuoteId(quoteId);
+      setQuoteDetails(details || []);
+      setSelectedQuoteId(quoteId);
+      setOpenDetailModal(true);
+    } catch (error) {
+      console.error('Error loading details:', error);
+      showAlert("Error", "dark", "error", "No se pudieron cargar los detalles");
+    }
+  };
+
+  const onSubmit = async (data: QuoteFormData) => {
+    try {
+      console.log('Form data submitted:', data); // Debug
+
+      // Validar que se haya seleccionado un proveedor
+      if (!data.supplier_id || data.supplier_id === "" || data.supplier_id === "0") {
+        showAlert("Error", "dark", "error", "Debe seleccionar un proveedor");
+        return;
       }
-      reset();
+
+      // Validar que haya al menos un producto válido
+      const validDetails = data.quote_details.filter(detail => 
+        detail.product_id && 
+        detail.product_id !== "" && 
+        detail.product_id !== "0" && 
+        detail.quantity_req > 0
+      );
+
+      if (validDetails.length === 0) {
+        showAlert("Error", "dark", "error", "Debe seleccionar al menos un producto");
+        return;
+      }
+
+      // Preparar datos para crear la cotización
+      const quoteData: CreateQuoteRequest = {
+        supplier_id: parseInt(data.supplier_id, 10),
+        code: data.code.trim(),
+        status: data.status
+      };
+
+      console.log('Sending quote data:', quoteData); // Debug
+
+      if (isEditing && selectedQuoteId) {
+        // Actualizar cotización existente
+        await update(selectedQuoteId, {
+          supplier_id: quoteData.supplier_id,
+          code: quoteData.code,
+          status: quoteData.status
+        });
+
+        // Crear nuevos detalles
+        for (const detail of validDetails) {
+          try {
+            await createDetail({
+              quote_id: selectedQuoteId,
+              product_id: parseInt(detail.product_id, 10),
+              quantity_req: detail.quantity_req,
+              unit: detail.unit.trim(),
+              status: "pending"
+            });
+          } catch (detailError) {
+            console.warn('Error creating detail:', detailError);
+          }
+        }
+
+        showAlert("Éxito", "dark", "success", "Cotización actualizada correctamente");
+      } else {
+        // Crear nueva cotización
+        const newQuote = await create(quoteData);
+
+        console.log('Created quote:', newQuote); // Debug
+
+        // Crear detalles
+        if (newQuote && newQuote.id) {
+          for (const detail of validDetails) {
+            try {
+              await createDetail({
+                quote_id: newQuote.id,
+                product_id: parseInt(detail.product_id, 10),
+                quantity_req: detail.quantity_req,
+                unit: detail.unit.trim(),
+                status: "pending"
+              });
+            } catch (detailError) {
+              console.warn('Error creating detail:', detailError);
+            }
+          }
+        }
+
+        showAlert("Éxito", "dark", "success", "Cotización creada correctamente");
+      }
+      
       handleCloseModal();
     } catch (error) {
-      console.error('Error in handleSubmitQuote:', error);
-      showAlert(
-        "Error",
-        "dark",
-        "error",
-        "Ha ocurrido un error. Por favor, intenta de nuevo."
-      );
+      console.error('Submit error:', error);
+      showAlert("Error", "dark", "error", "Ocurrió un error al guardar la cotización. Verifique los datos.");
     }
   };
 
-  const handleDeleteQuote = async (id: number) => {
-    try {
-      await deleteQuote(id);
-      showAlert(
-        "Cotización Eliminada",
-        "dark",
-        "success",
-        "¡Cotización eliminada exitosamente!"
-      );
-    } catch {
-      showAlert(
-        "Error",
-        "dark",
-        "error",
-        "Ha ocurrido un error al eliminar la cotización."
-      );
+  const addProduct = () => {
+    append({ product_id: "", quantity_req: 1, unit: "unidad" });
+  };
+
+  const removeProduct = (index: number) => {
+    if (fields.length > 1) {
+      remove(index);
     }
   };
 
-  const handleSupplierFilter = async (supplierId: number | null) => {
-    setSelectedSupplierId(supplierId);
-    if (supplierId) {
-      await getBySupplierId(supplierId);
-    }
+  const incrementQuantity = (index: number) => {
+    const currentQuantity = watch(`quote_details.${index}.quantity_req`);
+    setValue(`quote_details.${index}.quantity_req`, currentQuantity + 1);
   };
 
-  const getStatusIcon = (status?: string) => {
-    switch (status) {
-      case 'approved':
-        return <CheckCircle className="h-4 w-4 text-green-600" />;
-      case 'rejected':
-        return <XCircle className="h-4 w-4 text-red-600" />;
-      default:
-        return <Clock className="h-4 w-4 text-yellow-600" />;
+  const decrementQuantity = (index: number) => {
+    const currentQuantity = watch(`quote_details.${index}.quantity_req`);
+    if (currentQuantity > 1) {
+      setValue(`quote_details.${index}.quantity_req`, currentQuantity - 1);
     }
   };
-
-  const getStatusColor = (status?: string) => {
-    switch (status) {
-      case 'approved':
-        return 'bg-green-100 text-green-700';
-      case 'rejected':
-        return 'bg-red-100 text-red-700';
-      default:
-        return 'bg-yellow-100 text-yellow-700';
-    }
-  };
-
-  const getStatusText = (status?: string) => {
-    switch (status) {
-      case 'approved':
-        return 'Aprobada';
-      case 'rejected':
-        return 'Rechazada';
-      default:
-        return 'Pendiente';
-    }
-  };
-
-  const filteredQuotes = quotes.filter(
-    (quote) =>
-      (selectedSupplierId === null || quote.supplier_id === selectedSupplierId) &&
-      (selectedStatus === "" || quote.status === selectedStatus) &&
-      (quote.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      quote.supplier?.name?.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      {/* Header Section */}
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                <FileText className="h-8 w-8 text-green-600" />
-                Gestión de Cotizaciones
-              </h1>
-              <p className="text-gray-600 mt-2">
-                Administra las cotizaciones de proveedores
-              </p>
-            </div>
-            <button
-              onClick={handleCreateNew}
-              className="btn btn-primary bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 border-0 text-white px-6 py-3 rounded-lg flex items-center gap-2 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
-            >
-              <Plus className="h-5 w-5" />
-              Nueva Cotización
-            </button>
+      {/* Header */}
+      <div className="max-w-7xl mx-auto mb-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+              <FileText className="h-8 w-8 text-blue-600" />
+              Gestión de Cotizaciones
+            </h1>
+            <p className="text-gray-600 mt-2">
+              Administra cotizaciones con productos y cantidades
+            </p>
           </div>
-
-          {/* Search and Filter Bar */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Buscar cotizaciones..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 text-black pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors duration-200"
-                />
-              </div>
-              <select
-                value={selectedSupplierId || ""}
-                onChange={(e) => handleSupplierFilter(e.target.value ? parseInt(e.target.value) : null)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-black"
-              >
-                <option value="">Todos los proveedores</option>
-                {suppliers.map((supplier) => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-black"
-              >
-                <option value="">Todos los estados</option>
-                <option value="pending">Pendiente</option>
-                <option value="approved">Aprobada</option>
-                <option value="rejected">Rechazada</option>
-              </select>
-              <button className="btn text-black btn-outline border-gray-300 hover:bg-gray-50 flex items-center gap-2">
-                <Filter className="h-4 w-4" />
-                Filtros
-              </button>
-            </div>
-          </div>
+          <button
+            onClick={handleCreateNew}
+            className="btn btn-primary bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 border-0 text-white px-6 py-3 rounded-lg flex items-center gap-2 shadow-lg"
+          >
+            <Plus className="h-5 w-5" />
+            Nueva Cotización
+          </button>
         </div>
 
-        {/* Quotes Grid */}
-        {loading ? (
-          <div className="flex justify-center items-center py-16">
-            <div className="h-8 w-8 border-4 border-green-600 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-        ) : filteredQuotes.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredQuotes.map((quote) => (
-              <div
-                key={quote.id}
-                className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
-              >
-                <div className="p-6">
-                  {/* Quote Header */}
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="h-12 w-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
-                        <FileText className="h-6 w-6 text-white" />
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {getStatusIcon(quote.status)}
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(quote.status)}`}>
-                          {getStatusText(quote.status)}
-                        </span>
-                      </div>
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {quote.code || `COT-${quote.id}`}
-                    </h3>
-                  </div>
-
-                  {/* Quote Info */}
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-sm text-gray-600">Proveedor:</p>
-                      <p className="font-medium text-gray-900">{quote.supplier?.name}</p>
-                    </div>
-                    
-                    <div className="flex items-center gap-2 text-gray-600 text-sm">
-                      <Calendar className="h-4 w-4" />
-                      <span>{new Date(quote.date || '').toLocaleDateString()}</span>
-                    </div>
-
-                    {quote.quote_details && quote.quote_details.length > 0 && (
-                      <div>
-                        <p className="text-sm text-gray-600">Items:</p>
-                        <p className="font-medium text-gray-900">{quote.quote_details.length} productos</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100">
-                    <button
-                      onClick={() => handleEditQuote(quote)}
-                      className="flex-1 btn btn-outline btn-sm border-green-300 text-green-600 hover:bg-green-50 hover:border-green-400 transition-colors duration-200"
-                      title="Editar cotización"
-                    >
-                      <Edit className="h-3 w-3 mr-1" />
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => quote.id && handleDeleteQuote(quote.id)}
-                      className="flex-1 btn btn-outline btn-sm border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 transition-colors duration-200"
-                      title="Eliminar cotización"
-                    >
-                      <Trash2 className="h-3 w-3 mr-1" />
-                      Eliminar
-                    </button>
-                  </div>
+        {/* Lista de cotizaciones */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {quotes.map((quote) => (
+            <div key={quote.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {quote.code || `Cotización #${quote.id}`}
+                  </h3>
+                  <p className="text-sm text-gray-600 flex items-center gap-1 mt-1">
+                    <User className="h-3 w-3" />
+                    {getSupplierName(quote.supplier_id)}
+                  </p>
                 </div>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                  quote.status === 'approved' ? 'bg-green-100 text-green-700' :
+                  quote.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                  'bg-yellow-100 text-yellow-700'
+                }`}>
+                  {quote.status === 'pending' ? 'Pendiente' :
+                   quote.status === 'approved' ? 'Aprobada' : 'Rechazada'}
+                </span>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-16">
-            <div className="h-24 w-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FileText className="h-12 w-12 text-gray-400" />
+
+              <div className="text-sm text-gray-500 mb-4">
+                <p>Productos: {quote.quote_details?.length || 0}</p>
+                <p>Fecha: {quote.date ? new Date(quote.date).toLocaleDateString() : 'N/A'}</p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleViewDetails(quote.id!)}
+                  className="flex-1 btn btn-outline btn-sm border-blue-300 text-blue-600 hover:bg-blue-50"
+                >
+                  <Eye className="h-3 w-3 mr-1" />
+                  Ver Detalles
+                </button>
+                <button
+                  onClick={() => handleEdit(quote)}
+                  className="flex-1 btn btn-outline btn-sm border-green-300 text-green-600 hover:bg-green-50"
+                >
+                  <Edit className="h-3 w-3 mr-1" />
+                  Editar
+                </button>
+                <button
+                  onClick={() => deleteQuote(quote.id!)}
+                  className="flex-1 btn btn-outline btn-sm border-red-300 text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Eliminar
+                </button>
+              </div>
             </div>
-            <h3 className="text-xl font-medium text-gray-900 mb-2">
-              {searchTerm || selectedSupplierId || selectedStatus ? "No se encontraron cotizaciones" : "No hay cotizaciones"}
-            </h3>
-            <p className="text-gray-500 mb-6">
-              {searchTerm || selectedSupplierId || selectedStatus
-                ? "Intenta con otros términos de búsqueda o filtros"
-                : "Comienza creando tu primera cotización"
-              }
-            </p>
-            {!searchTerm && !selectedSupplierId && !selectedStatus && (
-              <button
-                onClick={handleCreateNew}
-                className="btn btn-primary bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 border-0 text-white px-6 py-3 rounded-lg flex items-center gap-2 mx-auto"
-              >
-                <Plus className="h-5 w-5" />
-                Crear Primera Cotización
-              </button>
-            )}
-          </div>
-        )}
+          ))}
+        </div>
       </div>
 
-      {/* Modal for Create/Edit */}
+      {/* Modal para crear/editar cotización */}
       <ModalComponent
         title={isEditing ? "Editar Cotización" : "Nueva Cotización"}
+        open={openModal}
+        onClose={handleCloseModal}
         content={
-          <form onSubmit={handleSubmit(handleSubmitQuote)} className="space-y-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            {/* Información básica */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Proveedor *
+                </label>
+                <select
+                  {...register("supplier_id", { 
+                    required: "El proveedor es requerido",
+                    validate: value => value !== "" && value !== "0" || "Debe seleccionar un proveedor válido"
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Seleccionar proveedor</option>
+                  {suppliers.map((supplier) => (
+                    <option key={supplier.id} value={supplier.id?.toString()}>
+                      {supplier.name}
+                    </option>
+                  ))}
+                </select>
+                {errors.supplier_id && (
+                  <p className="mt-1 text-sm text-red-600">{errors.supplier_id.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Código de Cotización *
+                </label>
+                <input
+                  {...register("code", { 
+                    required: "El código es requerido",
+                    minLength: { value: 1, message: "El código no puede estar vacío" }
+                  })}
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="COT-001"
+                />
+                {errors.code && (
+                  <p className="mt-1 text-sm text-red-600">{errors.code.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Estado
+                </label>
+                <select
+                  {...register("status")}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="pending">Pendiente</option>
+                  <option value="approved">Aprobada</option>
+                  <option value="rejected">Rechazada</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Productos */}
             <div>
-              <label htmlFor="supplier_id" className="block text-sm font-medium text-gray-700 mb-2">
-                Proveedor
-              </label>
-              <select
-                {...register("supplier_id", { 
-                  required: "Debe seleccionar un proveedor",
-                  valueAsNumber: true
-                })}
-                id="supplier_id"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors duration-200"
-              >
-                <option value="">Selecciona un proveedor</option>
-                {suppliers.map((supplier) => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.name}
-                  </option>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Productos</h3>
+                <button
+                  type="button"
+                  onClick={addProduct}
+                  className="btn btn-sm btn-outline border-green-300 text-green-600 hover:bg-green-50"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Añadir Producto
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {fields.map((field, index) => (
+                  <div key={field.id} className="bg-gray-50 p-4 rounded-lg border">
+                    <div className="flex items-start gap-4">
+                      {/* Selector de producto */}
+                      <div className="flex-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Producto *
+                        </label>
+                        <select
+                          {...register(`quote_details.${index}.product_id`, {
+                            required: "Selecciona un producto",
+                            validate: value => value !== "" && value !== "0" || "Debe seleccionar un producto válido"
+                          })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                        >
+                          <option value="">Seleccionar producto</option>
+                          {products.map((product) => (
+                            <option key={product.id} value={product.id?.toString()}>
+                              {product.name} - ${product.price}
+                            </option>
+                          ))}
+                        </select>
+                        {errors.quote_details?.[index]?.product_id && (
+                          <p className="mt-1 text-sm text-red-600">
+                            {errors.quote_details[index]?.product_id?.message}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Cantidad */}
+                      <div className="w-32">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Cantidad *
+                        </label>
+                        <div className="flex items-center border border-gray-300 rounded-lg">
+                          <button
+                            type="button"
+                            onClick={() => decrementQuantity(index)}
+                            className="px-2 py-1 text-gray-500 hover:text-gray-700"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </button>
+                          <input
+                            {...register(`quote_details.${index}.quantity_req`, {
+                              required: true,
+                              min: { value: 1, message: "Mínimo 1" },
+                              valueAsNumber: true
+                            })}
+                            type="number"
+                            min="1"
+                            className="w-full text-center border-0 focus:ring-0 py-1"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => incrementQuantity(index)}
+                            className="px-2 py-1 text-gray-500 hover:text-gray-700"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
+                        </div>
+                        {errors.quote_details?.[index]?.quantity_req && (
+                          <p className="mt-1 text-sm text-red-600">
+                            {errors.quote_details[index]?.quantity_req?.message}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Botón eliminar */}
+                      {fields.length > 1 && (
+                        <div className="mt-6">
+                          <button
+                            type="button"
+                            onClick={() => removeProduct(index)}
+                            className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 ))}
-              </select>
-              {errors.supplier_id && (
-                <p className="mt-1 text-sm text-red-600">{errors.supplier_id.message}</p>
-              )}
+              </div>
             </div>
 
-            <div>
-              <label htmlFor="code" className="block text-sm font-medium text-gray-700 mb-2">
-                Código de Cotización
-              </label>
-              <input
-                {...register("code")}
-                type="text"
-                id="code"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors duration-200"
-                placeholder="COT-001 (opcional)"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">
-                Estado
-              </label>
-              <select
-                {...register("status")}
-                id="status"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors duration-200"
-              >
-                <option value="pending">Pendiente</option>
-                <option value="approved">Aprobada</option>
-                <option value="rejected">Rechazada</option>
-              </select>
-            </div>
-
+            {/* Botones del formulario */}
             <div className="flex items-center justify-end gap-3 pt-4">
               <button
                 type="button"
@@ -389,22 +486,102 @@ export const QuoteComponent = () => {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="btn btn-primary bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 border-0 text-white px-6 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn btn-primary bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 border-0 text-white px-6 py-2 disabled:opacity-50"
               >
-                {isSubmitting ? (
-                  <div className="flex items-center gap-2">
-                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    {isEditing ? "Actualizando..." : "Creando..."}
-                  </div>
-                ) : (
-                  isEditing ? "Actualizar Cotización" : "Crear Cotización"
-                )}
+                {isSubmitting ? "Guardando..." : isEditing ? "Actualizar" : "Crear"} Cotización
               </button>
             </div>
           </form>
         }
-        onClose={handleCloseModal}
-        open={open}
+      />
+
+      {/* Modal para ver detalles */}
+      <ModalComponent
+        title="Detalles de la Cotización"
+        open={openDetailModal}
+        onClose={() => setOpenDetailModal(false)}
+        content={
+          <div className="space-y-6">
+            {selectedQuoteId && (
+              <>
+                {/* Información de la cotización */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-semibold text-gray-900 mb-3">Información General</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium text-gray-700">Proveedor:</span>
+                      <p className="text-gray-600">
+                        {getSupplierName(quotes.find(q => q.id === selectedQuoteId)?.supplier_id || 0)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-700">Código:</span>
+                      <p className="text-gray-600">
+                        {quotes.find(q => q.id === selectedQuoteId)?.code || `#${selectedQuoteId}`}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-700">Estado:</span>
+                      <p className="text-gray-600">
+                        {quotes.find(q => q.id === selectedQuoteId)?.status === 'pending' ? 'Pendiente' :
+                         quotes.find(q => q.id === selectedQuoteId)?.status === 'approved' ? 'Aprobada' : 'Rechazada'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-700">Fecha:</span>
+                      <p className="text-gray-600">
+                        {quotes.find(q => q.id === selectedQuoteId)?.date 
+                          ? new Date(quotes.find(q => q.id === selectedQuoteId)!.date!).toLocaleDateString()
+                          : 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Productos */}
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-3">Productos Cotizados</h3>
+                  <div className="space-y-3">
+                    {quoteDetails.length > 0 ? (
+                      quoteDetails.map((detail, index) => (
+                        <div key={index} className="border border-gray-200 rounded-lg p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <Package className="h-5 w-5 text-blue-500" />
+                              <div>
+                                <p className="font-medium text-gray-900">
+                                  {getProductName(detail.product_id)}
+                                </p>
+                                <p className="text-sm text-gray-600">
+                                  Cantidad solicitada: {detail.quantity_req} {detail.unit || 'unidades'}
+                                </p>
+                                {detail.price && (
+                                  <p className="text-sm text-green-600">
+                                    Precio: ${detail.price}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              detail.status === 'approved' ? 'bg-green-100 text-green-700' :
+                              detail.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                              'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {detail.status === 'pending' ? 'Pendiente' :
+                               detail.status === 'approved' ? 'Aprobado' : 'Rechazado'}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-gray-500 text-center py-8">No hay productos en esta cotización</p>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        }
       />
     </div>
   );

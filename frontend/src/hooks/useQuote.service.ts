@@ -34,12 +34,14 @@ export const useQuoteService = () => {
     }
   }, []);
 
-  const create = useCallback(async (data: CreateQuoteRequest) => {
+  const create = useCallback(async (data: CreateQuoteRequest): Promise<Quote> => {
     try {
       setLoading(true);
-      await service.create(data);
-      await getAll();
+      const newQuote = await service.create(data);
+      await getAll(); // Refrescar la lista
+      return newQuote; // Retornar la cotización creada
     } catch (error) {
+      console.error('Error creating quote:', error);
       throw new Error(error as string);
     } finally {
       setLoading(false);
@@ -61,8 +63,9 @@ export const useQuoteService = () => {
   const update = useCallback(async (id: number, data: UpdateQuoteRequest) => {
     try {
       setLoading(true);
-      await service.update(id, data);
+      const updatedQuote = await service.update(id, data);
       await getAll();
+      return updatedQuote;
     } catch (error) {
       throw new Error(error as string);
     } finally {
@@ -76,6 +79,17 @@ export const useQuoteService = () => {
       setLoading(true);
       const response = await service.getDetailsByQuoteId(quoteId);
       setQuoteDetails(response);
+      
+      // También actualizar la cotización
+      setQuotes(prevQuotes => 
+        prevQuotes.map(quote => 
+          quote.id === quoteId 
+            ? { ...quote, quote_details: response }
+            : quote
+        )
+      );
+      
+      return response;
     } catch (error) {
       throw new Error(error as string);
     } finally {
@@ -83,14 +97,18 @@ export const useQuoteService = () => {
     }
   }, []);
 
-  const createDetail = useCallback(async (data: CreateQuoteDetailRequest) => {
+  const createDetail = useCallback(async (data: CreateQuoteDetailRequest): Promise<QuoteDetail> => {
     try {
       setLoading(true);
-      await service.createDetail(data);
+      const newDetail = await service.createDetail(data);
+      
       if (data.quote_id) {
         await getDetailsByQuoteId(data.quote_id);
       }
+      
+      return newDetail;
     } catch (error) {
+      console.error('Error creating quote detail:', error);
       throw new Error(error as string);
     } finally {
       setLoading(false);
@@ -112,8 +130,9 @@ export const useQuoteService = () => {
   const updateDetail = useCallback(async (id: number, data: UpdateQuoteDetailRequest, quoteId: number) => {
     try {
       setLoading(true);
-      await service.updateDetail(id, data);
+      const updatedDetail = await service.updateDetail(id, data);
       await getDetailsByQuoteId(quoteId);
+      return updatedDetail;
     } catch (error) {
       throw new Error(error as string);
     } finally {
