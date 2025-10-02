@@ -53,6 +53,8 @@ model products {
   quote_details   quote_details[]
   buy_order_details buy_order_details[]
   
+  retaceo_details   retaceo_details[] //Relación con detalle de retaceo
+
   @@map("products")
 }
 
@@ -83,6 +85,7 @@ model suppliers {
   supplier_contacts supplier_contacts[]
   quotes           quotes[]
   buy_orders       buy_orders[]
+  retaceos         retaceo[]
   
   @@map("suppliers")
 }
@@ -161,6 +164,9 @@ model buy_orders {
   supplier            suppliers           @relation(fields: [supplier_id], references: [id])
   quote              quotes?             @relation(fields: [quote_id], references: [id])
   buy_order_details  buy_order_details[]
+
+  order_logs          order_log[]         // Relación con bitácora
+  retaceos            retaceo[]           // Relación con retaceo
   
   @@map("buy_orders")
 }
@@ -211,4 +217,85 @@ model clients {
   updatedAt DateTime @updatedAt
   
   @@map("clients")
+}
+
+// ===== TABLAS NUEVAS PARA RETACEO =====
+
+// Bitácora de gastos asociados a una orden de compra
+model order_log {
+  id            Int        @id @default(autoincrement())
+  buy_order_id  Int
+  date          DateTime
+  item          String     @db.VarChar(150) // Descripción del gasto
+  value         Float
+  expense_type  String     @db.VarChar(50)  // FOB, Flete, DAI, Seguro, Otros, etc.
+
+  // Relaciones
+  buy_order     buy_orders @relation(fields: [buy_order_id], references: [id], onDelete: Cascade)
+
+  @@map("order_log")
+}
+
+// Cabecera de retaceo (proceso de prorrateo de costos)
+model retaceo {
+  id              Int        @id @default(autoincrement())
+  code            String     @unique @db.VarChar(50) // Ejemplo: RTC-00233
+  date            DateTime   @default(now())
+  buy_order_id    Int?
+  supplier_id     Int
+  invoice_number  String?    @db.VarChar(100)
+  invoice_date    DateTime?
+  policy_number   String?    @db.VarChar(100)
+  policy_date     DateTime?
+
+  // Valores principales
+  fob_total       Float      // Total FOB
+  freight         Float      // Flete
+  insurance       Float      // Seguro
+  dai             Float      // Derecho Arancelario de Importación
+  other_expenses  Float      // Otros gastos adicionales
+  iva_percentage  Float      @default(15)  // % IVA
+  iva_amount      Float?     // Monto IVA (calculado)
+  cif_total       Float?     // FOB + Seguro + Flete
+
+  created_at      DateTime   @default(now())
+
+  // Relaciones
+  supplier        suppliers  @relation(fields: [supplier_id], references: [id])
+  buy_order       buy_orders? @relation(fields: [buy_order_id], references: [id])
+  retaceo_details retaceo_details[]
+
+  @@map("retaceo")
+}
+
+// Detalle de retaceo (costos prorrateados por producto)
+model retaceo_details {
+  id               Int       @id @default(autoincrement())
+  retaceo_id       Int
+  product_id       Int
+  quantity         Int
+  fob_cost         Float     // Costo FOB unitario
+  freight_cost     Float     // Flete prorrateado
+  freight_percent  Float     // % de flete aplicado
+  expenses_cost    Float     // Otros gastos prorrateados
+  expenses_percent Float     // % de otros gastos aplicado
+  dai_cost         Float     // DAI prorrateado
+  dai_percent      Float     // % DAI aplicado
+  unit_cost        Float     // Costo unitario final
+
+  // Relaciones
+  retaceo          retaceo   @relation(fields: [retaceo_id], references: [id], onDelete: Cascade)
+  product          products  @relation(fields: [product_id], references: [id])
+
+  @@map("retaceo_details")
+}
+
+// Catálogo de tipos de gastos (para clasificar gastos en la bitácora)
+model expense_types {
+  id          Int     @id @default(autoincrement())
+  name        String  @unique @db.VarChar(50) // FOB, Seguro, Flete, DAI, Honorarios, etc.
+  description String?
+  is_required Boolean @default(false) // Si es obligatorio o no
+
+  @@map("expense_types")
 }

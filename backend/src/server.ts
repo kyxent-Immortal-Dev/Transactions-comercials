@@ -21,6 +21,9 @@ import supplierContactRouter from "./routes/SupplierContact.router";
 import unitRouter from "./routes/Unit.router";
 import quoteRouter from "./routes/Quote.router";
 import buyOrderRouter from "./routes/BuyOrder.router";
+import expenseTypeRouter from "./routes/ExpenseType.router";
+import orderLogRouter from "./routes/OrderLog.router";
+import retaceoRouter from "./routes/Retaceo.router";
 
 export class Server {
   private server: express.Application;
@@ -51,6 +54,9 @@ export class Server {
       this.server.use("/api/units", unitRouter);
       this.server.use("/api/quotes", quoteRouter);
       this.server.use("/api/buy-orders", buyOrderRouter);
+  this.server.use("/api/expense-types", expenseTypeRouter);
+  this.server.use("/api/order-logs", orderLogRouter);
+  this.server.use("/api/retaceos", retaceoRouter);
 
       this.server.listen(this.port, () => {
         console.log(`running server On http://localhost:${this.port}`);
