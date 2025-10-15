@@ -49,11 +49,14 @@ model products {
   modified_by     String?        @db.VarChar(100)
   
   // Relaciones
-  subcategories   subcategories? @relation(fields: [subcategoriesid], references: [id], onDelete: Cascade)
-  quote_details   quote_details[]
-  buy_order_details buy_order_details[]
-  
-  retaceo_details   retaceo_details[] //Relación con detalle de retaceo
+  subcategories           subcategories?            @relation(fields: [subcategoriesid], references: [id], onDelete: Cascade)
+  quote_details           quote_details[]
+  buy_order_details       buy_order_details[]
+  purchase_details        purchase_details[]
+  retaceo_details         retaceo_details[]
+  price_analysis_details  price_analysis_details[]
+  prices                  price[]
+  price_history           price_history[]
 
   @@map("products")
 }
@@ -85,7 +88,7 @@ model suppliers {
   supplier_contacts supplier_contacts[]
   quotes           quotes[]
   buy_orders       buy_orders[]
-  retaceos         retaceo[]
+  purchases        purchase[]
   
   @@map("suppliers")
 }
@@ -164,9 +167,8 @@ model buy_orders {
   supplier            suppliers           @relation(fields: [supplier_id], references: [id])
   quote              quotes?             @relation(fields: [quote_id], references: [id])
   buy_order_details  buy_order_details[]
-
   order_logs          order_log[]         // Relación con bitácora
-  retaceos            retaceo[]           // Relación con retaceo
+  purchases           purchase[]          // Relación con purchase
   
   @@map("buy_orders")
 }
@@ -219,7 +221,7 @@ model clients {
   @@map("clients")
 }
 
-// ===== TABLAS NUEVAS PARA RETACEO =====
+// ===== TABLAS NUEVAS PARA RETACEO Y ANÁLISIS DE PRECIOS =====
 
 // Bitácora de gastos asociados a una orden de compra
 model order_log {
@@ -236,58 +238,141 @@ model order_log {
   @@map("order_log")
 }
 
+// Compra (Purchase) - Tabla intermedia entre orden de compra y retaceo
+model purchase {
+  id              Int        @id @default(autoincrement())
+  code            String?    @db.VarChar(50)
+  status          String?    @db.VarChar(50)
+  date            DateTime   @default(now())
+  num_invoice     String?    @db.VarChar(100)
+  buy_order_id    Int
+  supplier_id     Int
+
+  // Relaciones
+  buy_order         buy_orders         @relation(fields: [buy_order_id], references: [id])
+  supplier          suppliers          @relation(fields: [supplier_id], references: [id])
+  purchase_details  purchase_details[]
+  retaceos          retaceo[]
+
+  @@map("purchase")
+}
+
+// Detalles de compra
+model purchase_details {
+  id          Int     @id @default(autoincrement())
+  purchase_id Int
+  product_id  Int
+  quantity    Int?
+  price       Float?
+  unit        String? @db.VarChar(20)
+  status      String? @db.VarChar(50)
+
+  // Relaciones
+  purchase    purchase @relation(fields: [purchase_id], references: [id], onDelete: Cascade)
+  product     products @relation(fields: [product_id], references: [id])
+
+  @@map("purchase_details")
+}
+
 // Cabecera de retaceo (proceso de prorrateo de costos)
 model retaceo {
   id              Int        @id @default(autoincrement())
-  code            String     @unique @db.VarChar(50) // Ejemplo: RTC-00233
+  code            String?    @db.VarChar(50)
+  num_invoice     String?    @db.VarChar(100)
   date            DateTime   @default(now())
-  buy_order_id    Int?
-  supplier_id     Int
-  invoice_number  String?    @db.VarChar(100)
-  invoice_date    DateTime?
-  policy_number   String?    @db.VarChar(100)
-  policy_date     DateTime?
-
-  // Valores principales
-  fob_total       Float      // Total FOB
-  freight         Float      // Flete
-  insurance       Float      // Seguro
-  dai             Float      // Derecho Arancelario de Importación
-  other_expenses  Float      // Otros gastos adicionales
-  iva_percentage  Float      @default(15)  // % IVA
-  iva_amount      Float?     // Monto IVA (calculado)
-  cif_total       Float?     // FOB + Seguro + Flete
-
-  created_at      DateTime   @default(now())
+  status          String?    @db.VarChar(50)
+  purchase_id     Int
 
   // Relaciones
-  supplier        suppliers  @relation(fields: [supplier_id], references: [id])
-  buy_order       buy_orders? @relation(fields: [buy_order_id], references: [id])
-  retaceo_details retaceo_details[]
+  purchase          purchase            @relation(fields: [purchase_id], references: [id])
+  retaceo_details   retaceo_details[]
+  price_analysis    price_analysis[]
 
   @@map("retaceo")
 }
 
 // Detalle de retaceo (costos prorrateados por producto)
 model retaceo_details {
-  id               Int       @id @default(autoincrement())
-  retaceo_id       Int
-  product_id       Int
-  quantity         Int
-  fob_cost         Float     // Costo FOB unitario
-  freight_cost     Float     // Flete prorrateado
-  freight_percent  Float     // % de flete aplicado
-  expenses_cost    Float     // Otros gastos prorrateados
-  expenses_percent Float     // % de otros gastos aplicado
-  dai_cost         Float     // DAI prorrateado
-  dai_percent      Float     // % DAI aplicado
-  unit_cost        Float     // Costo unitario final
+  id          Int     @id @default(autoincrement())
+  retaceo_id  Int
+  product_id  Int
+  quantity    Int?
+  price       Float?
+  status      String? @db.VarChar(50)
 
   // Relaciones
-  retaceo          retaceo   @relation(fields: [retaceo_id], references: [id], onDelete: Cascade)
-  product          products  @relation(fields: [product_id], references: [id])
+  retaceo     retaceo  @relation(fields: [retaceo_id], references: [id], onDelete: Cascade)
+  product     products @relation(fields: [product_id], references: [id])
 
   @@map("retaceo_details")
+}
+
+// Análisis de precios
+model price_analysis {
+  id          Int      @id @default(autoincrement())
+  code        String?  @db.VarChar(50)
+  status      String?  @db.VarChar(50)
+  date        DateTime @default(now())
+  num_invoice String?  @db.VarChar(100)
+  retaceo_id  Int
+
+  // Relaciones
+  retaceo                   retaceo                     @relation(fields: [retaceo_id], references: [id])
+  price_analysis_details    price_analysis_details[]
+  price_history             price_history[]
+
+  @@map("price_analysis")
+}
+
+// Detalles de análisis de precios
+model price_analysis_details {
+  id                Int     @id @default(autoincrement())
+  price_analysis_id Int
+  product_id        Int
+  quantity          Int?
+  price             Float?
+  utility_percent   Float?
+
+  // Relaciones
+  price_analysis    price_analysis @relation(fields: [price_analysis_id], references: [id], onDelete: Cascade)
+  product           products       @relation(fields: [product_id], references: [id])
+
+  @@map("price_analysis_details")
+}
+
+// Tabla de precios de productos
+model price {
+  id                    Int      @id @default(autoincrement())
+  product_id            Int
+  bill_cost             Float?   // Costo de factura
+  final_bill_retaceo    Float?   // Costo final con retaceo
+  price                 Float?   // Precio de venta
+  utility               Float?   // Utilidad
+  date                  DateTime @default(now())
+
+  // Relaciones
+  product               products @relation(fields: [product_id], references: [id])
+
+  @@map("price")
+}
+
+// Historial de precios
+model price_history {
+  id                    Int      @id @default(autoincrement())
+  product_id            Int
+  price_analysis_id     Int?
+  bill_cost             Float?
+  final_bill_retaceo    Float?
+  price                 Float?
+  utility               Float?
+  date                  DateTime @default(now())
+  status                String?  @db.VarChar(50)
+
+  // Relaciones
+  product               products        @relation(fields: [product_id], references: [id])
+  price_analysis        price_analysis? @relation(fields: [price_analysis_id], references: [id])
+
+  @@map("price_history")
 }
 
 // Catálogo de tipos de gastos (para clasificar gastos en la bitácora)

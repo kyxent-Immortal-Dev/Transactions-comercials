@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useBuyOrderService } from "../hooks/useBuyOrder.service";
 import { useSupplierService } from "../hooks/useSupplier.service";
 import { useQuoteService } from "../hooks/useQuote.service";
 import { ModalComponent } from "./ModalComponent";
 import { useForm } from "react-hook-form";
 import { BuyOrder, CreateBuyOrderRequest, UpdateBuyOrderRequest } from "../interfaces/BuyOrder.interface";
-import { Plus, Edit, Trash2, ShoppingCart, Search, Filter, Calendar, CheckCircle, Clock, XCircle, Truck } from "lucide-react";
+import { Plus, Edit, Trash2, ShoppingCart, Search, Filter, Calendar, CheckCircle, Clock, XCircle, Truck, RefreshCw } from "lucide-react";
 import { useAlertsService } from "../hooks/useAlerts.service";
+import { generateBuyOrderCode, getNextSequence } from "../utils/codeGenerator";
 
 export const BuyOrderComponent = () => {
   const { buyOrders, create, update, deleteBuyOrder, loading, getBySupplierId, getByQuoteId } = useBuyOrderService();
@@ -51,6 +52,13 @@ export const BuyOrderComponent = () => {
   const handleCreateNew = () => {
     setIsEditing(false);
     reset();
+    
+    // Generar código automáticamente
+    const existingCodes = buyOrders.map(order => order.code || "").filter(code => code);
+    const nextSeq = getNextSequence(existingCodes, "ORD");
+    const newCode = generateBuyOrderCode(nextSeq);
+    setValue("code", newCode);
+    
     setOpen(true);
   };
 
@@ -58,6 +66,31 @@ export const BuyOrderComponent = () => {
     setOpen(false);
     setIsEditing(false);
     reset();
+  };
+
+  // Auto-completar campos cuando se selecciona una cotización
+  const handleQuoteChange = (quoteId: number) => {
+    if (quoteId) {
+      const selectedQuote = quotes.find(q => q.id === quoteId);
+      if (selectedQuote) {
+        // Auto-completar proveedor desde la cotización
+        if (selectedQuote.supplier_id) {
+          setValue("supplier_id", selectedQuote.supplier_id);
+        }
+        // Auto-completar fecha de llegada (30 días después de hoy por defecto)
+        const arrivalDate = new Date();
+        arrivalDate.setDate(arrivalDate.getDate() + 30);
+        setValue("date_arrival", arrivalDate.toISOString().split('T')[0]);
+      }
+    }
+  };
+
+  // Regenerar código manualmente
+  const handleRegenerateCode = () => {
+    const existingCodes = buyOrders.map(order => order.code || "").filter(code => code);
+    const nextSeq = getNextSequence(existingCodes, "ORD");
+    const newCode = generateBuyOrderCode(nextSeq);
+    setValue("code", newCode);
   };
 
   const handleSubmitBuyOrder = async (data: CreateBuyOrderRequest) => {
@@ -386,10 +419,12 @@ export const BuyOrderComponent = () => {
             <div>
               <label htmlFor="quote_id" className="block text-sm font-medium text-gray-700 mb-2">
                 Cotización (Opcional)
+                <span className="text-xs text-gray-500 ml-2">Auto-completa proveedor y fecha</span>
               </label>
               <select
                 {...register("quote_id", { valueAsNumber: true })}
                 id="quote_id"
+                onChange={(e) => handleQuoteChange(Number(e.target.value))}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
               >
                 <option value="">Sin cotización base</option>
@@ -405,13 +440,24 @@ export const BuyOrderComponent = () => {
               <label htmlFor="code" className="block text-sm font-medium text-gray-700 mb-2">
                 Código de Orden
               </label>
-              <input
-                {...register("code")}
-                type="text"
-                id="code"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                placeholder="ORD-001 (opcional)"
-              />
+              <div className="flex gap-2">
+                <input
+                  {...register("code")}
+                  type="text"
+                  id="code"
+                  className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                  placeholder="ORD-20251013-0001"
+                />
+                <button
+                  type="button"
+                  onClick={handleRegenerateCode}
+                  className="px-4 py-3 bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors duration-200"
+                  title="Regenerar código"
+                >
+                  <RefreshCw className="h-5 w-5" />
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">El código se genera automáticamente</p>
             </div>
 
             <div>

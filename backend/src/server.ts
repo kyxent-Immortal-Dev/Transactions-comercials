@@ -24,6 +24,9 @@ import buyOrderRouter from "./routes/BuyOrder.router";
 import expenseTypeRouter from "./routes/ExpenseType.router";
 import orderLogRouter from "./routes/OrderLog.router";
 import retaceoRouter from "./routes/Retaceo.router";
+import purchaseRouter from "./routes/Purchase.router";
+import priceAnalysisRouter from "./routes/PriceAnalysis.router";
+import priceRouter from "./routes/Price.router";
 
 export class Server {
   private server: express.Application;
@@ -56,7 +59,10 @@ export class Server {
       this.server.use("/api/buy-orders", buyOrderRouter);
   this.server.use("/api/expense-types", expenseTypeRouter);
   this.server.use("/api/order-logs", orderLogRouter);
+  this.server.use("/api/purchases", purchaseRouter);
   this.server.use("/api/retaceos", retaceoRouter);
+  this.server.use("/api/price-analysis", priceAnalysisRouter);
+  this.server.use("/api", priceRouter);
 
       this.server.listen(this.port, () => {
         console.log(`running server On http://localhost:${this.port}`);

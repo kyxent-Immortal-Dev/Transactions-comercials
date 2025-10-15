@@ -21,16 +21,20 @@ export class RetaceoController {
       res.json(item);
     } catch { res.status(500).json({ error: 'Error fetching retaceo' }); }
   }
-  async getByBuyOrderId(req: Request, res: Response) {
+  async getByPurchaseId(req: Request, res: Response) {
     try {
-      const boid = parseInt(req.params.buyOrderId as string);
-      res.json(await this.repo.findByBuyOrderId(boid));
+      const purchaseId = parseInt(req.params.purchaseId as string);
+      res.json(await this.repo.findByPurchaseId(purchaseId));
     } catch { res.status(500).json({ error: 'Error fetching retaceos' }); }
   }
   async create(req: Request, res: Response) {
     try {
       const data: CreateRetaceoRequest = req.body;
       const created = await this.repo.create(data);
+      console.log(data);
+      
+      console.log(created);
+      
       res.status(201).json(created);
     } catch { res.status(500).json({ error: 'Error creating retaceo' }); }
   }

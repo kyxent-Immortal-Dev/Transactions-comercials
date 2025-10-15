@@ -44,100 +44,52 @@ export interface UpdateOrderLogRequest {
 
 export interface Retaceo {
   id?: number;
-  code: string;
+  code?: string | null;
+  num_invoice?: string | null;
   date?: Date;
-  buy_order_id?: number | null;
-  supplier_id: number;
-  invoice_number?: string | null;
-  invoice_date?: Date | null;
-  policy_number?: string | null;
-  policy_date?: Date | null;
-  fob_total: number;
-  freight: number;
-  insurance: number;
-  dai: number;
-  other_expenses: number;
-  iva_percentage?: number | null;
-  iva_amount?: number | null;
-  cif_total?: number | null;
-  created_at?: Date;
+  status?: string | null;
+  purchase_id: number;
   retaceo_details?: RetaceoDetail[];
+  purchase?: any;
 }
 
 export interface CreateRetaceoRequest {
-  code: string;
-  buy_order_id?: number | null;
-  supplier_id: number;
-  invoice_number?: string | null;
-  invoice_date?: Date | null;
-  policy_number?: string | null;
-  policy_date?: Date | null;
-  fob_total: number;
-  freight: number;
-  insurance: number;
-  dai: number;
-  other_expenses: number;
-  iva_percentage?: number | null;
-  iva_amount?: number | null;
-  cif_total?: number | null;
+  code?: string | null;
+  num_invoice?: string | null;
+  date?: Date | string | null;
+  status?: string | null;
+  purchase_id: number;
 }
 
 export interface UpdateRetaceoRequest {
-  code?: string;
-  buy_order_id?: number | null;
-  supplier_id?: number;
-  invoice_number?: string | null;
-  invoice_date?: Date | null;
-  policy_number?: string | null;
-  policy_date?: Date | null;
-  fob_total?: number;
-  freight?: number;
-  insurance?: number;
-  dai?: number;
-  other_expenses?: number;
-  iva_percentage?: number | null;
-  iva_amount?: number | null;
-  cif_total?: number | null;
+  code?: string | null;
+  num_invoice?: string | null;
+  date?: Date | string | null;
+  status?: string | null;
+  purchase_id?: number;
 }
 
 export interface RetaceoDetail {
   id?: number;
   retaceo_id: number;
   product_id: number;
-  quantity: number;
-  fob_cost: number;
-  freight_cost: number;
-  freight_percent: number;
-  expenses_cost: number;
-  expenses_percent: number;
-  dai_cost: number;
-  dai_percent: number;
-  unit_cost: number;
+  quantity?: number | null;
+  price?: number | null;
+  status?: string | null;
   product?: any;
 }
 
 export interface CreateRetaceoDetailRequest {
   retaceo_id: number;
   product_id: number;
-  quantity: number;
-  fob_cost: number;
-  freight_cost: number;
-  freight_percent: number;
-  expenses_cost: number;
-  expenses_percent: number;
-  dai_cost: number;
-  dai_percent: number;
-  unit_cost: number;
+  quantity?: number | null;
+  price?: number | null;
+  status?: string | null;
 }
 
 export interface UpdateRetaceoDetailRequest {
-  quantity?: number;
-  fob_cost?: number;
-  freight_cost?: number;
-  freight_percent?: number;
-  expenses_cost?: number;
-  expenses_percent?: number;
-  dai_cost?: number;
-  dai_percent?: number;
-  unit_cost?: number;
+  product_id?: number;
+  quantity?: number | null;
+  price?: number | null;
+  status?: string | null;
 }

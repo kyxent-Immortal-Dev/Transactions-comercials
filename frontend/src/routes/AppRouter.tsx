@@ -13,6 +13,10 @@ import { SupplierContactPage } from "../pages/SupplierContactPage";
 import { UnitPage } from "../pages/UnitPage";
 import { QuotePage } from "../pages/QuotePage";
 import { BuyOrderPage } from "../pages/BuyOrderPage";
+import { PurchasePage } from "../pages/PurchasePage";
+import { RetaceoPage } from "../pages/RetaceoPage";
+import { PriceAnalysisPage } from "../pages/PriceAnalysisPage";
+import { PricePage } from "../pages/PricePage";
 import { AuthGuard } from "../guard/auth/Auth.guard";
 import { useAuthStore } from "../store/Auth.service";
 
@@ -44,6 +48,10 @@ export const AppRouter = () => {
           <Route path="/units" element={<UnitPage />} />
           <Route path="/quotes" element={<QuotePage />} />
           <Route path="/buy-orders" element={<BuyOrderPage />} />
+          <Route path="/purchases" element={<PurchasePage />} />
+          <Route path="/retaceos" element={<RetaceoPage />} />
+          <Route path="/price-analysis" element={<PriceAnalysisPage />} />
+          <Route path="/prices" element={<PricePage />} />
           <Route path="/calculate" element={<CalculoComplejo />} />
         </Route>
 
