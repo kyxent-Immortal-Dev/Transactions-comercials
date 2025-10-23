@@ -25,18 +25,47 @@ export class OrderLogController {
   async create(req: Request, res: Response) {
     try {
       const data: CreateOrderLogRequest = req.body;
-      const created = await this.repo.create(data);
+      console.log('Creating order log with data:', data);
+      
+      // Convertir fecha si viene como string
+      const orderLogData = {
+        ...data,
+        date: data.date instanceof Date ? data.date : new Date(data.date),
+        value: Number(data.value), // Asegurar que value es número
+        buy_order_id: Number(data.buy_order_id) // Asegurar que es número
+      };
+      
+      console.log('Processed order log data:', orderLogData);
+      
+      const created = await this.repo.create(orderLogData);
+      console.log('Order log created:', created);
+      
       res.status(201).json(created);
-    } catch { res.status(500).json({ error: 'Error creating order log' }); }
+    } catch (error) {
+      console.error('Error creating order log:', error);
+      res.status(500).json({ error: 'Error creating order log' });
+    }
   }
   async update(req: Request, res: Response) {
     try {
       const id = parseInt(req.params.id as string);
       const data: UpdateOrderLogRequest = req.body;
-      const updated = await this.repo.update(id, data);
+      
+      // Convertir fecha si viene como string
+      const orderLogData = {
+        ...data,
+        date: data.date ? (data.date instanceof Date ? data.date : new Date(data.date)) : undefined,
+        value: data.value !== undefined ? Number(data.value) : undefined,
+        buy_order_id: data.buy_order_id !== undefined ? Number(data.buy_order_id) : undefined
+      };
+      
+      const updated = await this.repo.update(id, orderLogData);
       if (!updated) return res.status(404).json({ error: 'Not found' });
       res.json(updated);
-    } catch { res.status(500).json({ error: 'Error updating order log' }); }
+    } catch (error) {
+      console.error('Error updating order log:', error);
+      res.status(500).json({ error: 'Error updating order log' });
+    }
   }
   async delete(req: Request, res: Response) {
     try {

@@ -37,7 +37,7 @@ model products {
   size            String?        @db.VarChar(50)  // Tamaño del producto
   description     String?
   presentation    String?        // Presentación del producto
-  price           Float?
+  price           Float?         // Precio de venta final
   image           String?
   amount          Int?           // Stock actual
   purchase_unit   String?        @db.VarChar(20)  // Unidad de compra
@@ -47,6 +47,11 @@ model products {
   modified_at     DateTime       @updatedAt
   created_by      String?        @db.VarChar(100)
   modified_by     String?        @db.VarChar(100)
+  
+  // Campos para gestión de costos y precios
+  bill_cost           Float?         // Costo de factura (FOB)
+  final_bill_retaceo  Float?         // Costo final con retaceo
+  utility             Float?         // Porcentaje de utilidad
   
   // Relaciones
   subcategories           subcategories?            @relation(fields: [subcategoriesid], references: [id], onDelete: Cascade)

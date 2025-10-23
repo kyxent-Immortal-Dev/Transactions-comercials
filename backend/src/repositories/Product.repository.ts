@@ -27,6 +27,19 @@ export class ProductRepository implements ProductRepositoryInterface {
       throw new Error(error as string);
     }
   }
+  async getById(id: number): Promise<ProductInterface | null> {
+    try {
+      const request = await this.postgresql.products.findUnique({
+        where: {
+          id: id,
+        },
+      });
+
+      return request as ProductInterface | null;
+    } catch (error) {
+      throw new Error(error as string);
+    }
+  }
   async create(data: Partial<ProductInterface>): Promise<ProductInterface> {
     try {
       const request = await this.postgresql.products.create({ data });

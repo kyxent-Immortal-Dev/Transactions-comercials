@@ -3,9 +3,10 @@ import { useBuyOrderService } from "../hooks/useBuyOrder.service";
 import { useSupplierService } from "../hooks/useSupplier.service";
 import { useQuoteService } from "../hooks/useQuote.service";
 import { ModalComponent } from "./ModalComponent";
+import { BuyOrderDetailModal } from "./BuyOrderDetailModal";
 import { useForm } from "react-hook-form";
 import { BuyOrder, CreateBuyOrderRequest, UpdateBuyOrderRequest } from "../interfaces/BuyOrder.interface";
-import { Plus, Edit, Trash2, ShoppingCart, Search, Filter, Calendar, CheckCircle, Clock, XCircle, Truck, RefreshCw } from "lucide-react";
+import { Plus, Edit, Trash2, ShoppingCart, Search, Filter, Calendar, CheckCircle, Clock, XCircle, Truck, RefreshCw, Eye } from "lucide-react";
 import { useAlertsService } from "../hooks/useAlerts.service";
 import { generateBuyOrderCode, getNextSequence } from "../utils/codeGenerator";
 
@@ -21,6 +22,10 @@ export const BuyOrderComponent = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>("");
+  
+  // Estado para el modal de detalles con bitácora
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [selectedBuyOrder, setSelectedBuyOrder] = useState<BuyOrder | null>(null);
 
   const {
     handleSubmit,
@@ -142,6 +147,16 @@ export const BuyOrderComponent = () => {
         "Ha ocurrido un error al eliminar la orden."
       );
     }
+  };
+
+  const handleViewDetails = (order: BuyOrder) => {
+    setSelectedBuyOrder(order);
+    setDetailModalOpen(true);
+  };
+
+  const handleCloseDetailModal = () => {
+    setDetailModalOpen(false);
+    setSelectedBuyOrder(null);
   };
 
   const handleSupplierFilter = async (supplierId: number | null) => {
@@ -338,23 +353,33 @@ export const BuyOrderComponent = () => {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100">
+                  <div className="space-y-2 mt-4 pt-4 border-t border-gray-100">
                     <button
-                      onClick={() => handleEditBuyOrder(order)}
-                      className="flex-1 btn btn-outline btn-sm border-indigo-300 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-400 transition-colors duration-200"
-                      title="Editar orden"
+                      onClick={() => handleViewDetails(order)}
+                      className="w-full btn btn-sm bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white border-0 transition-all duration-200"
+                      title="Ver detalles y bitácora"
                     >
-                      <Edit className="h-3 w-3 mr-1" />
-                      Editar
+                      <Eye className="h-3 w-3 mr-1" />
+                      Ver Detalles y Bitácora
                     </button>
-                    <button
-                      onClick={() => order.id && handleDeleteBuyOrder(order.id)}
-                      className="flex-1 btn btn-outline btn-sm border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 transition-colors duration-200"
-                      title="Eliminar orden"
-                    >
-                      <Trash2 className="h-3 w-3 mr-1" />
-                      Eliminar
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleEditBuyOrder(order)}
+                        className="flex-1 btn btn-outline btn-sm border-indigo-300 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-400 transition-colors duration-200"
+                        title="Editar orden"
+                      >
+                        <Edit className="h-3 w-3 mr-1" />
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => order.id && handleDeleteBuyOrder(order.id)}
+                        className="flex-1 btn btn-outline btn-sm border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 transition-colors duration-200"
+                        title="Eliminar orden"
+                      >
+                        <Trash2 className="h-3 w-3 mr-1" />
+                        Eliminar
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -516,6 +541,15 @@ export const BuyOrderComponent = () => {
         onClose={handleCloseModal}
         open={open}
       />
+
+      {/* Modal de Detalles con Bitácora */}
+      {selectedBuyOrder && (
+        <BuyOrderDetailModal
+          buyOrder={selectedBuyOrder}
+          isOpen={detailModalOpen}
+          onClose={handleCloseDetailModal}
+        />
+      )}
     </div>
   );
 };

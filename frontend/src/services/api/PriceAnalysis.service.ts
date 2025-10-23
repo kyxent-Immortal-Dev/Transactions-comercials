@@ -5,7 +5,8 @@ import type {
   UpdatePriceAnalysisRequest,
   PriceAnalysisDetail,
   CreatePriceAnalysisDetailRequest,
-  UpdatePriceAnalysisDetailRequest
+  UpdatePriceAnalysisDetailRequest,
+  ApplyPriceAnalysisResponse
 } from "../../interfaces/PriceAnalysis.interface";
 
 export class PriceAnalysisService {
@@ -52,6 +53,15 @@ export class PriceAnalysisService {
     }
   }
 
+  async createFromRetaceo(retaceoId: number): Promise<PriceAnalysis> {
+    try {
+      const request = await this.client.post(`/price-analysis/from-retaceo/${retaceoId}`);
+      return request.data as PriceAnalysis;
+    } catch (error) {
+      throw new Error(error as string);
+    }
+  }
+
   async update(id: number, data: UpdatePriceAnalysisRequest): Promise<PriceAnalysis> {
     try {
       const request = await this.client.put(`/price-analysis/${id}`, data);
@@ -64,6 +74,15 @@ export class PriceAnalysisService {
   async delete(id: number): Promise<void> {
     try {
       await this.client.delete(`/price-analysis/${id}`);
+    } catch (error) {
+      throw new Error(error as string);
+    }
+  }
+
+  async applyAnalysis(id: number): Promise<ApplyPriceAnalysisResponse> {
+    try {
+      const request = await this.client.post(`/price-analysis/${id}/apply`);
+      return request.data as ApplyPriceAnalysisResponse;
     } catch (error) {
       throw new Error(error as string);
     }

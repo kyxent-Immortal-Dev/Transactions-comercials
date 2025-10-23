@@ -15,7 +15,20 @@ export interface PriceAnalysis {
         id?: number;
         name?: string | null;
       };
+      purchase_details?: Array<{
+        id?: number;
+        product_id?: number;
+        quantity?: number | null;
+        price?: number | null;
+      }>;
     };
+    retaceo_details?: Array<{
+      id?: number;
+      product_id: number;
+      quantity?: number | null;
+      price?: number | null;
+      product?: any;
+    }>;
   };
   price_analysis_details?: PriceAnalysisDetail[];
 }

@@ -27,8 +27,8 @@ export const ProductComponent = () => {
       image: "",
       name: "",
       description: "",
-      price: 0,
-      amount: 0,
+      price: undefined, // No se asigna precio en creación
+      amount: 0, // Stock se actualiza con las compras
       subcategoriesid: 0,
     },
   });
@@ -200,15 +200,31 @@ export const ProductComponent = () => {
                     </p>
                     
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-green-600 font-semibold">
+                      <div className="flex items-center gap-2 font-semibold">
                         <DollarSign className="h-4 w-4" />
-                        <span>${product.price}</span>
+                        {product.price && product.price > 0 ? (
+                          <span className="text-green-600">${product.price.toFixed(2)}</span>
+                        ) : (
+                          <span className="text-gray-400 text-sm">Sin precio</span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 text-gray-500 text-sm">
                         <Hash className="h-3 w-3" />
                         <span>{product.amount} unidades</span>
                       </div>
                     </div>
+
+                    {/* Indicador de estado de precio */}
+                    {(!product.price || product.price === 0) && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg px-2 py-1">
+                        <p className="text-xs text-amber-700 flex items-center gap-1">
+                          <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                          Pendiente de retaceo
+                        </p>
+                      </div>
+                    )}
 
                     <div className="pt-2 border-t border-gray-100">
                       <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">
@@ -339,51 +355,95 @@ export const ProductComponent = () => {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-2">
-                  Precio
-                </label>
-                <input
-                  {...register("price", { 
-                    required: "El precio es requerido",
-                    min: {
-                      value: 0,
-                      message: "El precio debe ser mayor a 0"
-                    }
-                  })}
-                  type="number"
-                  step="0.01"
-                  id="price"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors duration-200"
-                  placeholder="0.00"
-                />
-                {errors.price && (
-                  <p className="mt-1 text-sm text-red-600">{errors.price.message}</p>
-                )}
-              </div>
+              {/* Campo de Precio - Solo visible en edición y read-only */}
+              {isEditing && (
+                <div>
+                  <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-2">
+                    Precio de Venta
+                    <span className="text-xs text-gray-500 ml-2">(Solo lectura)</span>
+                  </label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                      {...register("price")}
+                      type="number"
+                      step="0.01"
+                      id="price"
+                      readOnly
+                      disabled
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
+                      placeholder="Se asignará después del retaceo"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-blue-600">
+                    ℹ️ El precio se asigna automáticamente después del proceso de retaceo
+                  </p>
+                </div>
+              )}
 
-              <div>
-                <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-2">
-                  Cantidad
-                </label>
-                <input
-                  {...register("amount", { 
-                    required: "La cantidad es requerida",
-                    min: {
-                      value: 0,
-                      message: "La cantidad debe ser mayor o igual a 0"
-                    }
-                  })}
-                  type="number"
-                  id="amount"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors duration-200"
-                  placeholder="0"
-                />
-                {errors.amount && (
-                  <p className="mt-1 text-sm text-red-600">{errors.amount.message}</p>
-                )}
-              </div>
+              {/* Campo de Stock/Cantidad - Solo visible en edición y read-only */}
+              {isEditing && (
+                <div>
+                  <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-2">
+                    Stock Disponible
+                    <span className="text-xs text-gray-500 ml-2">(Solo lectura)</span>
+                  </label>
+                  <div className="relative">
+                    <Hash className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                      {...register("amount")}
+                      type="number"
+                      id="amount"
+                      readOnly
+                      disabled
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
+                      placeholder="Se actualiza con las compras"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-blue-600">
+                    ℹ️ El stock se actualiza automáticamente al recibir compras
+                  </p>
+                </div>
+              )}
             </div>
+
+            {/* Mensaje informativo al crear producto */}
+            {!isEditing && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-semibold text-blue-900 mb-1">
+                      ℹ️ Sobre el Precio y Stock del Producto
+                    </h4>
+                    <p className="text-sm text-blue-700 mb-2">
+                      El precio de venta y el stock se gestionan automáticamente:
+                    </p>
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-sm font-medium text-blue-800">📊 Stock:</p>
+                        <ul className="mt-1 text-sm text-blue-700 list-disc list-inside ml-2">
+                          <li>Se actualiza automáticamente al recibir compras</li>
+                          <li>Se reduce automáticamente con las ventas</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-blue-800">💰 Precio:</p>
+                        <ul className="mt-1 text-sm text-blue-700 list-disc list-inside ml-2">
+                          <li>Registro de gastos en la bitácora</li>
+                          <li>Cálculo del retaceo (prorrateo de costos)</li>
+                          <li>Análisis de precios con margen de utilidad</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div>
               <label htmlFor="subcategoriesid" className="block text-sm font-medium text-gray-700 mb-2">

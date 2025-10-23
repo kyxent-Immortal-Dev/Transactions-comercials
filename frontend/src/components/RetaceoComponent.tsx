@@ -4,12 +4,20 @@ import { usePurchase } from "../hooks/usePurchase.service";
 import { ModalComponent } from "./ModalComponent";
 import { useForm } from "react-hook-form";
 import type { Retaceo, CreateRetaceoRequest } from "../interfaces/Retaceo.interface";
-import { Plus, Edit, Trash2, FileText, Search, Calendar, Package, RefreshCw } from "lucide-react";
+import {
+  Plus,
+  Edit,
+  Trash2,
+  FileText,
+  Search,
+  Calendar,
+  Package,
+  CheckCircle,
+} from "lucide-react";
 import { useAlertsService } from "../hooks/useAlerts.service";
-import { generateRetaceoCode, generateInvoiceNumber, getNextSequence } from "../utils/codeGenerator";
 
 export const RetaceoComponent = () => {
-  const { retaceos, create, update, deleteRetaceo, loading } = useRetaceoService();
+  const { retaceos, createWithCalculation, update, deleteRetaceo, loading, approveRetaceo } = useRetaceoService();
   const { purchases } = usePurchase();
   const { showAlert } = useAlertsService();
 
@@ -50,22 +58,7 @@ export const RetaceoComponent = () => {
   const handleCreateNew = () => {
     setIsEditing(false);
     reset();
-    
-    // Generar código automáticamente
-    const existingCodes = retaceos.map(r => r.code || "").filter(code => code);
-    const nextSeq = getNextSequence(existingCodes, "RET");
-    const newCode = generateRetaceoCode(nextSeq);
-    setValue("code", newCode);
-    
-    // Generar número de factura automáticamente
-    const existingInvoices = retaceos.map(r => r.num_invoice || "").filter(inv => inv);
-    const nextInvSeq = getNextSequence(existingInvoices, "INV");
-    const newInvoice = generateInvoiceNumber(nextInvSeq);
-    setValue("num_invoice", newInvoice);
-    
-    // Fecha por defecto (hoy)
     setValue("date", new Date().toISOString().split('T')[0]);
-    
     setOpen(true);
   };
 
@@ -75,57 +68,33 @@ export const RetaceoComponent = () => {
     reset();
   };
 
-  // Regenerar código manualmente
-  const handleRegenerateCode = () => {
-    const existingCodes = retaceos.map(r => r.code || "").filter(code => code);
-    const nextSeq = getNextSequence(existingCodes, "RET");
-    const newCode = generateRetaceoCode(nextSeq);
-    setValue("code", newCode);
-  };
-
-  // Regenerar número de factura manualmente
-  const handleRegenerateInvoice = () => {
-    const existingInvoices = retaceos.map(r => r.num_invoice || "").filter(inv => inv);
-    const nextInvSeq = getNextSequence(existingInvoices, "INV");
-    const newInvoice = generateInvoiceNumber(nextInvSeq);
-    setValue("num_invoice", newInvoice);
-  };
-
   const handleSubmitRetaceo = async (data: CreateRetaceoRequest) => {
     try {
-      // Asegurar que purchase_id sea número
-      const retaceoData = {
-        ...data,
-        purchase_id: Number(data.purchase_id)
+      // Asegurar que purchase_id sea número y preparar data para createWithCalculation
+      const calculationData = {
+        purchase_id: Number(data.purchase_id),
+        num_invoice: data.num_invoice || undefined,
+        date: data.date ? new Date(data.date).toISOString() : undefined,
       };
 
       if (isEditing && editingRetaceoId) {
-        await update(editingRetaceoId, retaceoData);
-        showAlert(
-          "Retaceo Actualizado",
-          "dark",
-          "success",
-          "¡Retaceo actualizado exitosamente!"
-        );
+        // Para editar, usamos el `update` normal, asegurando que los datos opcionales sean correctos
+        const updateData = {
+          ...data,
+          purchase_id: Number(data.purchase_id),
+        };
+        await update(editingRetaceoId, updateData);
+        showAlert("Retaceo Actualizado", "dark", "success", "¡Retaceo actualizado exitosamente!");
       } else {
-        await create(retaceoData);
-        showAlert(
-          "Retaceo Creado",
-          "dark",
-          "success",
-          "¡Retaceo creado exitosamente!"
-        );
+        // Para crear, usamos `createWithCalculation`
+        await createWithCalculation(calculationData);
+        showAlert("Retaceo Creado", "dark", "success", "¡Retaceo creado y calculado exitosamente!");
       }
       reset();
       handleCloseModal();
     } catch (error) {
       console.error('Error in handleSubmitRetaceo:', error);
-      showAlert(
-        "Error",
-        "dark",
-        "error",
-        "Ha ocurrido un error. Por favor, intenta de nuevo."
-      );
+      showAlert("Error", "dark", "error", "Ha ocurrido un error. Por favor, intenta de nuevo.");
     }
   };
 
@@ -144,6 +113,26 @@ export const RetaceoComponent = () => {
         "dark",
         "error",
         "Ha ocurrido un error al eliminar el retaceo."
+      );
+    }
+  };
+
+  const handleApproveRetaceo = async (id: number) => {
+    try {
+      await approveRetaceo(id);
+      showAlert(
+        "Retaceo Aprobado",
+        "dark",
+        "success",
+        "¡El retaceo ha sido aprobado y los productos han sido actualizados!"
+      );
+    } catch (error) {
+      console.error('Error approving retaceo:', error);
+      showAlert(
+        "Error",
+        "dark",
+        "error",
+        "Ha ocurrido un error al aprobar el retaceo."
       );
     }
   };
@@ -209,7 +198,7 @@ export const RetaceoComponent = () => {
               <option value="">Todas las Compras</option>
               {purchases.map((purchase) => (
                 <option key={purchase.id} value={purchase.id}>
-                  {purchase.code || `#${purchase.id}`} - {purchase.supplier?.name}
+                  {purchase.code || `#${purchase.id}`} - {purchase.buy_order?.code} - {purchase.supplier?.name}
                 </option>
               ))}
             </select>
@@ -225,6 +214,7 @@ export const RetaceoComponent = () => {
               <option value="">Todos los Estados</option>
               <option value="pending">Pendiente</option>
               <option value="completed">Completado</option>
+              <option value="approved">Aprobado</option>
               <option value="cancelled">Cancelado</option>
             </select>
           </div>
@@ -313,6 +303,8 @@ export const RetaceoComponent = () => {
                           ? 'bg-yellow-100 text-yellow-800'
                           : retaceo.status === 'cancelled'
                           ? 'bg-red-100 text-red-800'
+                          : retaceo.status === 'approved'
+                          ? 'bg-blue-100 text-blue-800'
                           : 'bg-gray-100 text-gray-800'
                       }`}>
                         {retaceo.status || 'N/A'}
@@ -320,6 +312,15 @@ export const RetaceoComponent = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-center gap-2">
+                        {retaceo.status === 'pending' && (
+                          <button
+                            onClick={() => retaceo.id && handleApproveRetaceo(retaceo.id)}
+                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Aprobar Retaceo"
+                          >
+                            <CheckCircle size={18} />
+                          </button>
+                        )}
                         <button
                           onClick={() => handleEditRetaceo(retaceo)}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -351,32 +352,6 @@ export const RetaceoComponent = () => {
         title={isEditing ? "Editar Retaceo" : "Nuevo Retaceo"}
         content={
           <form onSubmit={handleSubmit(handleSubmitRetaceo)} className="space-y-6">
-            {/* Code */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Código
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  {...register("code")}
-                  placeholder="RET-20251013-0001"
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-                {!isEditing && (
-                  <button
-                    type="button"
-                    onClick={handleRegenerateCode}
-                    className="px-4 py-2 bg-purple-50 text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors duration-200"
-                    title="Regenerar código"
-                  >
-                    <RefreshCw className="h-5 w-5" />
-                  </button>
-                )}
-              </div>
-              <p className="mt-1 text-xs text-gray-500">El código se genera automáticamente</p>
-            </div>
-
             {/* Purchase Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -401,30 +376,17 @@ export const RetaceoComponent = () => {
               )}
             </div>
 
-            {/* Invoice Number */}
+            {/* Invoice Number (simplified) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Número de Factura
+                Número de Factura (Opcional)
               </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  {...register("num_invoice")}
-                  placeholder="INV-20251013-0001"
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-                {!isEditing && (
-                  <button
-                    type="button"
-                    onClick={handleRegenerateInvoice}
-                    className="px-4 py-2 bg-purple-50 text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors duration-200"
-                    title="Regenerar número de factura"
-                  >
-                    <RefreshCw className="h-5 w-5" />
-                  </button>
-                )}
-              </div>
-              <p className="mt-1 text-xs text-gray-500">El número se genera automáticamente</p>
+              <input
+                type="text"
+                {...register("num_invoice")}
+                placeholder="INV-20251013-0001"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
             </div>
 
             {/* Date */}
@@ -444,20 +406,8 @@ export const RetaceoComponent = () => {
               )}
             </div>
 
-            {/* Status */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Estado
-              </label>
-              <select
-                {...register("status")}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              >
-                <option value="pending">Pendiente</option>
-                <option value="completed">Completado</option>
-                <option value="cancelled">Cancelado</option>
-              </select>
-            </div>
+            {/* Status (Hidden or removed if always 'pending' on creation) */}
+            <input type="hidden" {...register("status")} value="pending" />
 
             {/* Buttons */}
             <div className="flex justify-end gap-3 mt-6">
@@ -473,7 +423,7 @@ export const RetaceoComponent = () => {
                 disabled={isSubmitting}
                 className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {isSubmitting ? "Guardando..." : isEditing ? "Actualizar" : "Crear"}
+                {isSubmitting ? "Creando..." : "Crear Retaceo"}
               </button>
             </div>
           </form>

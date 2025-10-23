@@ -50,12 +50,59 @@ export interface UpdateRetaceoDetailRequest {
   status?: string | null;
 }
 
-// Helper interfaces for nested objects
+// ===== ORDER LOG INTERFACES =====
+export interface OrderLog {
+  id?: number;
+  buy_order_id: number;
+  date: Date | string;
+  item: string;
+  value: number;
+  expense_type: string;
+}
+
+export interface CreateOrderLogRequest {
+  buy_order_id: number;
+  date: Date | string;
+  item: string;
+  value: number;
+  expense_type: string;
+}
+
+export interface UpdateOrderLogRequest {
+  buy_order_id?: number;
+  date?: Date | string;
+  item?: string;
+  value?: number;
+  expense_type?: string;
+}
+
+// ===== EXPENSE TYPE INTERFACES =====
+export interface ExpenseType {
+  id?: number;
+  name: string;
+  description?: string | null;
+  is_required?: boolean | null;
+}
+
+export interface CreateExpenseTypeRequest {
+  name: string;
+  description?: string | null;
+  is_required?: boolean | null;
+}
+
+export interface UpdateExpenseTypeRequest {
+  name?: string;
+  description?: string | null;
+  is_required?: boolean | null;
+}
+
+// ===== HELPER INTERFACES =====
 interface Purchase {
   id?: number;
   code?: string | null;
   supplier?: Supplier;
   buy_order?: BuyOrder;
+  purchase_details?: PurchaseDetail[];
 }
 
 interface Supplier {
@@ -66,6 +113,13 @@ interface Supplier {
 interface BuyOrder {
   id?: number;
   code?: string | null;
+}
+
+interface PurchaseDetail {
+  id?: number;
+  product_id?: number;
+  quantity?: number | null;
+  price?: number | null;
 }
 
 interface Product {

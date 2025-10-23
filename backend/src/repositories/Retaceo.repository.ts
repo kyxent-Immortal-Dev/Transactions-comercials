@@ -24,16 +24,6 @@ export class RetaceoRepository {
     }) as unknown as Retaceo[];
   }
 
-  async findById(id: number): Promise<Retaceo | null> {
-    return await this.prisma.retaceo.findUnique({
-      where: { id },
-      include: { 
-        retaceo_details: { include: { product: true } }, 
-        purchase: { include: { supplier: true, buy_order: true } }
-      }
-    }) as unknown as Retaceo | null;
-  }
-
   async findByPurchaseId(purchase_id: number): Promise<Retaceo[]> {
     return await this.prisma.retaceo.findMany({
       where: { purchase_id },
@@ -43,6 +33,39 @@ export class RetaceoRepository {
       },
       orderBy: { date: 'desc' }
     }) as unknown as Retaceo[];
+  }
+
+  async getById(id: number): Promise<Retaceo | null> {
+    return await this.prisma.retaceo.findUnique({
+      where: { id },
+      include: {
+        retaceo_details: {
+          include: {
+            product: true,
+          },
+        },
+        purchase: {
+          include: {
+            supplier: true,
+            buy_order: {
+              include: {
+                order_logs: true,
+              },
+            },
+          },
+        },
+      },
+    }) as unknown as Retaceo | null;
+  }
+
+  async findById(id: number): Promise<Retaceo | null> {
+    return await this.prisma.retaceo.findUnique({
+      where: { id },
+      include: { 
+        retaceo_details: { include: { product: true } }, 
+        purchase: { include: { supplier: true, buy_order: true } }
+      }
+    }) as unknown as Retaceo | null;
   }
 
   async create(data: CreateRetaceoRequest): Promise<Retaceo> {

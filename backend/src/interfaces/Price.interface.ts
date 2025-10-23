@@ -32,12 +32,13 @@ export interface UpdatePriceRequest {
 export interface PriceHistory {
   id: number;
   product_id: number;
-  price_analysis_id: number;
+  price_analysis_id?: number | null;
   bill_cost: number;
   final_bill_retaceo: number;
   price: number;
-  utility: number;
+  utility?: number | null;
   date: Date;
+  status?: string | null;
   product?: any;
   createdAt?: Date;
   updatedAt?: Date;
@@ -45,20 +46,22 @@ export interface PriceHistory {
 
 export interface CreatePriceHistoryRequest {
   product_id: number;
-  price_analysis_id: number;
+  price_analysis_id?: number | null;
   bill_cost: number;
   final_bill_retaceo: number;
   price: number;
-  utility: number;
+  utility?: number | null;
   date?: Date | string;
+  status?: string | null;
 }
 
 export interface UpdatePriceHistoryRequest {
   product_id?: number;
-  price_analysis_id?: number;
+  price_analysis_id?: number | null;
   bill_cost?: number;
   final_bill_retaceo?: number;
   price?: number;
-  utility?: number;
+  utility?: number | null;
   date?: Date | string;
+  status?: string | null;
 }

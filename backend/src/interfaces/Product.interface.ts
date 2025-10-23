@@ -6,4 +6,7 @@ export interface ProductInterface {
   image: string;
   amount: number;
   subcategoriesid: number;
+  final_bill_retaceo?: number | null;
+  bill_cost?: number | null;
+  utility?: number | null;
 }

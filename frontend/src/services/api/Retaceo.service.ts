@@ -113,4 +113,34 @@ export class RetaceoService {
       throw new Error(error as string);
     }
   }
+
+  // Calcular retaceo automáticamente
+  async calculateRetaceo(purchaseId: number): Promise<any> {
+    try {
+      const request = await this.client.post("/retaceos/calculate", { purchase_id: purchaseId });
+      return request.data;
+    } catch (error) {
+      throw new Error(error as string);
+    }
+  }
+
+  // Crear retaceo con cálculo automático
+  async createWithCalculation(data: { purchase_id: number; code?: string; num_invoice?: string; date?: string }): Promise<any> {
+    try {
+      const request = await this.client.post("/retaceos/create-with-calculation", data);
+      return request.data;
+    } catch (error) {
+      throw new Error(error as string);
+    }
+  }
+
+  // Aprobar retaceo y actualizar precios
+  async approveRetaceo(id: number): Promise<any> {
+    try {
+      const request = await this.client.post(`/retaceos/${id}/approve`);
+      return request.data;
+    } catch (error) {
+      throw new Error(error as string);
+    }
+  }
 }

@@ -9,6 +9,8 @@ router.get('/', (req, res) => ctrl.getAll(req, res));
 router.get('/retaceo/:retaceoId', (req, res) => ctrl.getByRetaceoId(req, res));
 router.get('/:id', (req, res) => ctrl.getById(req, res));
 router.post('/', (req, res) => ctrl.create(req, res));
+router.post('/from-retaceo/:retaceoId', (req, res) => ctrl.createFromRetaceo(req, res));
+router.post('/:id/apply', (req, res) => ctrl.apply(req, res));
 router.put('/:id', (req, res) => ctrl.update(req, res));
 router.delete('/:id', (req, res) => ctrl.delete(req, res));
 

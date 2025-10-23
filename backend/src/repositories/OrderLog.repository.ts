@@ -53,4 +53,44 @@ export class OrderLogRepository {
       return false;
     }
   }
+
+  /**
+   * Obtener el total de gastos por tipo para una orden de compra
+   */
+  async getTotalsByExpenseType(buy_order_id: number): Promise<{ [key: string]: number }> {
+    const logs = await this.findByBuyOrderId(buy_order_id);
+    const totals: { [key: string]: number } = {};
+    
+    logs.forEach(log => {
+      const type = log.expense_type;
+      if (!totals[type]) {
+        totals[type] = 0;
+      }
+      totals[type] += log.value;
+    });
+    
+    return totals;
+  }
+
+  /**
+   * Calcular el total de gastos de una orden de compra
+   */
+  async getTotalExpenses(buy_order_id: number): Promise<number> {
+    const logs = await this.findByBuyOrderId(buy_order_id);
+    return logs.reduce((sum, log) => sum + log.value, 0);
+  }
+
+  /**
+   * Obtener resumen de gastos agrupados por tipo
+   */
+  async getExpenseSummary(buy_order_id: number) {
+    const totals = await this.getTotalsByExpenseType(buy_order_id);
+    const grandTotal = await this.getTotalExpenses(buy_order_id);
+    
+    return {
+      byType: totals,
+      total: grandTotal,
+      details: await this.findByBuyOrderId(buy_order_id)
+    };
+  }
 }

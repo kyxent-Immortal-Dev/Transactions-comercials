@@ -17,6 +17,7 @@ interface QuoteFormData {
   quote_details: {
     product_id: string; 
     quantity_req: number;
+    price: number;
     unit: string;
   }[];
 }
@@ -46,7 +47,7 @@ export const QuoteComponent = () => {
       supplier_id: "",
       code: "",
       status: "pending",
-      quote_details: [{ product_id: "", quantity_req: 1, unit: "unidad" }]
+      quote_details: [{ product_id: "", quantity_req: 1, price: 0, unit: "unidad" }]
     }
   });
 
@@ -73,7 +74,7 @@ export const QuoteComponent = () => {
       supplier_id: "",
       code: "",
       status: "pending",
-      quote_details: [{ product_id: "", quantity_req: 1, unit: "unidad" }]
+      quote_details: [{ product_id: "", quantity_req: 1, price: 0, unit: "unidad" }]
     });
     setOpenModal(true);
   };
@@ -89,10 +90,11 @@ export const QuoteComponent = () => {
       setValue("quote_details", quote.quote_details.map((detail: QuoteDetail) => ({
         product_id: detail.product_id.toString(),
         quantity_req: detail.quantity_req || 1,
+        price: detail.price ?? 0,
         unit: detail.unit || "unidad"
       })));
     } else {
-      setValue("quote_details", [{ product_id: "", quantity_req: 1, unit: "unidad" }]);
+      setValue("quote_details", [{ product_id: "", quantity_req: 1, price: 0, unit: "unidad" }]);
     }
     
     setSelectedQuoteId(quote.id!);
@@ -133,11 +135,12 @@ export const QuoteComponent = () => {
         detail.product_id && 
         detail.product_id !== "" && 
         detail.product_id !== "0" && 
-        detail.quantity_req > 0
+        detail.quantity_req > 0 &&
+        Number(detail.price) > 0
       );
 
       if (validDetails.length === 0) {
-        showAlert("Error", "dark", "error", "Debe seleccionar al menos un producto");
+        showAlert("Error", "dark", "error", "Cada producto debe tener cantidad y precio FOB mayor a 0");
         return;
       }
 
@@ -203,10 +206,14 @@ export const QuoteComponent = () => {
           const prodId = parseInt(formDet.product_id, 10);
           const existing = existingByProduct.get(prodId)?.[0];
           if (existing && existing.id) {
-            const needsUpdate = (existing.quantity_req || 0) !== formDet.quantity_req || (existing.unit || "").trim() !== formDet.unit.trim();
+            const needsUpdate =
+              (existing.quantity_req || 0) !== formDet.quantity_req ||
+              (existing.unit || "").trim() !== formDet.unit.trim() ||
+              (existing.price ?? 0) !== formDet.price;
             if (needsUpdate) {
               await updateDetail(existing.id, {
                 quantity_req: formDet.quantity_req,
+                price: formDet.price,
                 unit: formDet.unit.trim()
               }, selectedQuoteId);
             }
@@ -220,6 +227,7 @@ export const QuoteComponent = () => {
               quote_id: selectedQuoteId,
               product_id: prodId,
               quantity_req: formDet.quantity_req,
+              price: formDet.price,
               unit: formDet.unit.trim(),
               status: "pending"
             });
@@ -241,6 +249,7 @@ export const QuoteComponent = () => {
                 quote_id: newQuote.id,
                 product_id: parseInt(detail.product_id, 10),
                 quantity_req: detail.quantity_req,
+                price: detail.price,
                 unit: detail.unit.trim(),
                 status: "pending"
               });
@@ -261,7 +270,7 @@ export const QuoteComponent = () => {
   };
 
   const addProduct = () => {
-    append({ product_id: "", quantity_req: 1, unit: "unidad" });
+    append({ product_id: "", quantity_req: 1, price: 0, unit: "unidad" });
   };
 
   const removeProduct = (index: number) => {
@@ -471,6 +480,30 @@ export const QuoteComponent = () => {
                         {errors.quote_details?.[index]?.product_id && (
                           <p className="mt-1 text-sm text-red-600">
                             {errors.quote_details[index]?.product_id?.message}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Precio */}
+                      <div className="w-40">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Precio FOB *
+                        </label>
+                        <input
+                          {...register(`quote_details.${index}.price`, {
+                            required: "Ingresa el precio FOB",
+                            min: { value: 0.01, message: "Debe ser mayor a 0" },
+                            valueAsNumber: true
+                          })}
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                          placeholder="0.00"
+                        />
+                        {errors.quote_details?.[index]?.price && (
+                          <p className="mt-1 text-sm text-red-600">
+                            {errors.quote_details[index]?.price?.message}
                           </p>
                         )}
                       </div>

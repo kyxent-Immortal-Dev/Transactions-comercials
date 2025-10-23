@@ -1,9 +1,11 @@
 import { Request, Response } from 'express';
 import { BuyOrderRepositoryImpl } from '../repositories/BuyOrder.repository';
+import { PrismaClient } from '../generated/prisma';
 import { CreateBuyOrderRequest, UpdateBuyOrderRequest, CreateBuyOrderDetailRequest, UpdateBuyOrderDetailRequest } from '../interfaces/BuyOrder.interface';
 
 export class BuyOrderController {
   private buyOrderRepository: BuyOrderRepositoryImpl;
+  private prisma = new PrismaClient();
 
   constructor() {
     this.buyOrderRepository = new BuyOrderRepositoryImpl();
@@ -20,7 +22,7 @@ export class BuyOrderController {
 
   async getBuyOrderById(req: Request, res: Response): Promise<void> {
     try {
-      const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string, 10);
       const buyOrder = await this.buyOrderRepository.findById(id);
       
       if (!buyOrder) {
@@ -58,6 +60,8 @@ export class BuyOrderController {
     try {
       const buyOrderData: CreateBuyOrderRequest = req.body;
       
+      console.log('Creating buy order with data:', buyOrderData);
+      
       // Handle date conversion if provided
       if (buyOrderData.date_arrival) {
         buyOrderData.date_arrival = new Date(buyOrderData.date_arrival);
@@ -69,7 +73,76 @@ export class BuyOrderController {
       }
       
       const buyOrder = await this.buyOrderRepository.create(buyOrderData);
-      res.status(201).json(buyOrder);
+      console.log('Buy order created:', buyOrder);
+      
+      const sourceQuoteId = buyOrder.quote_id ?? buyOrderData.quote_id;
+
+      // Si la orden viene de una cotización, copiar los detalles automáticamente
+      if (sourceQuoteId) {
+        console.log(`[BuyOrderController] Using quote ${sourceQuoteId} as source for buy order details`);
+
+        let quoteDetails = await this.prisma.quote_details.findMany({
+          where: {
+            quote_id: sourceQuoteId,
+            status: 'approved',
+          },
+          include: { product: true },
+        });
+
+        console.log(
+          `[BuyOrderController] Found ${quoteDetails.length} approved quote_details to copy for Quote ID: ${sourceQuoteId}`
+        );
+
+        if (quoteDetails.length === 0) {
+          console.warn(
+            `[BuyOrderController] No 'approved' details found for Quote ID: ${sourceQuoteId}. Falling back to all quote_details.`
+          );
+
+          quoteDetails = await this.prisma.quote_details.findMany({
+            where: { quote_id: sourceQuoteId },
+            include: { product: true },
+          });
+
+          console.log(
+            `[BuyOrderController] Fallback retrieved ${quoteDetails.length} quote_details for Quote ID: ${sourceQuoteId}`
+          );
+        }
+
+        if (quoteDetails.length === 0) {
+          console.error(
+            `[BuyOrderController] Quote ID: ${sourceQuoteId} has no details to copy. Buy order will remain without items.`
+          );
+        }
+
+        for (const detail of quoteDetails) {
+          const approvedQuantity = detail.quantity_approved ?? detail.quantity_req ?? 0;
+
+          if (approvedQuantity <= 0) {
+            console.warn(
+              `[BuyOrderController] Skipping quote_detail ID: ${detail.id} because approved quantity is ${approvedQuantity}.`
+            );
+            continue;
+          }
+
+          const buyOrderDetailData = {
+            buy_order_id: buyOrder.id!,
+            product_id: detail.product_id,
+            quantity: approvedQuantity,
+            price: detail.price ?? undefined,
+            unit: detail.unit ?? undefined,
+            status: 'pending',
+          };
+
+          console.log('[BuyOrderController] Creating buy_order_detail with data:', buyOrderDetailData);
+          const buyOrderDetail = await this.buyOrderRepository.createDetail(buyOrderDetailData);
+          console.log('[BuyOrderController] Created buy_order_detail:', buyOrderDetail);
+        }
+      }
+      
+      // Obtener la orden completa con detalles
+      const completeBuyOrder = await this.buyOrderRepository.findById(buyOrder.id!);
+      
+      res.status(201).json(completeBuyOrder);
     } catch (error) {
       console.error('Error creating buy order:', error);
       res.status(500).json({ error: 'Error creating buy order' });
@@ -78,7 +151,7 @@ export class BuyOrderController {
 
   async updateBuyOrder(req: Request, res: Response): Promise<void> {
     try {
-      const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string, 10);
       const buyOrderData: UpdateBuyOrderRequest = req.body;
       
       // Handle date conversion if provided
@@ -107,7 +180,7 @@ export class BuyOrderController {
 
   async deleteBuyOrder(req: Request, res: Response): Promise<void> {
     try {
-      const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string, 10);
       const success = await this.buyOrderRepository.delete(id);
       
       if (!success) {
@@ -134,7 +207,7 @@ export class BuyOrderController {
 
   async getBuyOrderDetailsByBuyOrderId(req: Request, res: Response): Promise<void> {
     try {
-      const buyOrderId = parseInt(req.params.buyOrderId);
+  const buyOrderId = parseInt(req.params.buyOrderId as string, 10);
       const details = await this.buyOrderRepository.findDetailsByBuyOrderId(buyOrderId);
       res.json(details);
     } catch (error) {
@@ -144,7 +217,7 @@ export class BuyOrderController {
 
   async getBuyOrderDetailById(req: Request, res: Response): Promise<void> {
     try {
-      const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string, 10);
       const detail = await this.buyOrderRepository.findDetailById(id);
       
       if (!detail) {
@@ -160,7 +233,7 @@ export class BuyOrderController {
 
   async updateBuyOrderDetail(req: Request, res: Response): Promise<void> {
     try {
-      const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string, 10);
       const detailData: UpdateBuyOrderDetailRequest = req.body;
       const detail = await this.buyOrderRepository.updateDetail(id, detailData);
       
@@ -177,7 +250,7 @@ export class BuyOrderController {
 
   async deleteBuyOrderDetail(req: Request, res: Response): Promise<void> {
     try {
-      const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string, 10);
       const success = await this.buyOrderRepository.deleteDetail(id);
       
       if (!success) {

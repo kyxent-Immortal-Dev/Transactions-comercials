@@ -126,6 +126,44 @@ export const useRetaceoService = () => {
     }
   }, [getDetailsByRetaceoId]);
 
+  // Nuevas funciones para cálculo y aprobación
+  const calculateRetaceo = useCallback(async (purchaseId: number) => {
+    try {
+      setLoading(true);
+      return await service.calculateRetaceo(purchaseId);
+    } catch (error) {
+      throw new Error(error as string);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const createWithCalculation = useCallback(async (data: { purchase_id: number; code?: string; num_invoice?: string; date?: string }) => {
+    try {
+      setLoading(true);
+      const result = await service.createWithCalculation(data);
+      await getAll();
+      return result;
+    } catch (error) {
+      throw new Error(error as string);
+    } finally {
+      setLoading(false);
+    }
+  }, [getAll]);
+
+  const approveRetaceo = useCallback(async (id: number) => {
+    try {
+      setLoading(true);
+      const result = await service.approveRetaceo(id);
+      await getAll();
+      return result;
+    } catch (error) {
+      throw new Error(error as string);
+    } finally {
+      setLoading(false);
+    }
+  }, [getAll]);
+
   useEffect(() => {
     getAll();
   }, [getAll]);
@@ -143,5 +181,8 @@ export const useRetaceoService = () => {
     createDetail,
     deleteRetaceoDetail,
     updateDetail,
+    calculateRetaceo,
+    createWithCalculation,
+    approveRetaceo,
   };
 };

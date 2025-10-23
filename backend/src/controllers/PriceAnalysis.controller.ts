@@ -62,6 +62,31 @@ export class PriceAnalysisController {
     }
   }
 
+  async createFromRetaceo(req: Request, res: Response) {
+    try {
+      const retaceoId = parseInt(req.params.retaceoId as string);
+
+      if (Number.isNaN(retaceoId)) {
+        return res.status(400).json({ message: "RetaceoId inválido" });
+      }
+
+      const priceAnalysis = await repository.createFromRetaceo(retaceoId);
+      res.status(201).json(priceAnalysis);
+    } catch (error) {
+      console.error("Error creating price analysis from retaceo:", error);
+      if (error instanceof Error && error.message.includes("Ya existe")) {
+        return res.status(409).json({ message: error.message });
+      }
+      if (error instanceof Error && error.message === "Retaceo no encontrado") {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error instanceof Error && error.message.includes("no tiene detalles")) {
+        return res.status(400).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Error al generar el análisis desde el retaceo" });
+    }
+  }
+
   // Actualizar análisis de precio
   async update(req: Request, res: Response) {
     try {
@@ -72,6 +97,28 @@ export class PriceAnalysisController {
     } catch (error) {
       console.error("Error updating price analysis:", error);
       res.status(500).json({ message: "Error al actualizar el análisis de precio" });
+    }
+  }
+
+  async apply(req: Request, res: Response) {
+    try {
+      const id = parseInt(req.params.id as string);
+
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ message: "ID inválido" });
+      }
+
+      const result = await repository.applyAnalysis(id);
+      res.json(result);
+    } catch (error) {
+      console.error("Error applying price analysis:", error);
+      if (error instanceof Error && error.message.includes("ya fue aprobado")) {
+        return res.status(409).json({ message: error.message });
+      }
+      if (error instanceof Error && error.message.includes("no encontrado")) {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Error al aplicar el análisis de precio" });
     }
   }
 

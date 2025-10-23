@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { PurchaseRepository } from '../repositories/Purchase.repository';
+import { PrismaClient } from '../generated/prisma';
 import type {
   CreatePurchaseRequest,
   UpdatePurchaseRequest,
@@ -9,6 +10,7 @@ import type {
 
 export class PurchaseController {
   private repo = new PurchaseRepository();
+  private prisma = new PrismaClient();
 
   async getAll(req: Request, res: Response) {
     try { res.json(await this.repo.findAll()); } catch { res.status(500).json({ error: 'Error fetching purchases' }); }
@@ -33,9 +35,42 @@ export class PurchaseController {
   async create(req: Request, res: Response) {
     try {
       const data: CreatePurchaseRequest = req.body;
+      console.log('Creating purchase with data:', data);
+      
       const created = await this.repo.create(data);
-      res.status(201).json(created);
-    } catch { res.status(500).json({ error: 'Error creating purchase' }); }
+      console.log('Purchase created:', created);
+      
+      // Si la compra viene de una orden de compra, copiar los detalles automáticamente
+      if (data.buy_order_id) {
+        const buyOrderDetails = await this.prisma.buy_order_details.findMany({
+          where: { buy_order_id: data.buy_order_id },
+          include: { product: true }
+        });
+        
+        console.log(`Found ${buyOrderDetails.length} buy_order_details to copy`);
+        
+        // Crear purchase_details para cada buy_order_detail
+        for (const detail of buyOrderDetails) {
+          const purchaseDetail = await this.repo.createDetail({
+            purchase_id: created.id!,
+            product_id: detail.product_id,
+            quantity: detail.quantity,
+            price: detail.price,
+            unit: detail.unit,
+            status: 'pending'
+          });
+          console.log('Created purchase_detail:', purchaseDetail);
+        }
+      }
+      
+      // Obtener la compra completa con detalles
+      const completePurchase = await this.repo.findById(created.id!);
+      
+      res.status(201).json(completePurchase);
+    } catch (error) {
+      console.error('Error creating purchase:', error);
+      res.status(500).json({ error: 'Error creating purchase' });
+    }
   }
   
   async update(req: Request, res: Response) {

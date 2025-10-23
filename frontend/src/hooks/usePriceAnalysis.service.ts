@@ -7,7 +7,8 @@ import type {
   UpdatePriceAnalysisRequest,
   PriceAnalysisDetail,
   CreatePriceAnalysisDetailRequest,
-  UpdatePriceAnalysisDetailRequest
+  UpdatePriceAnalysisDetailRequest,
+  ApplyPriceAnalysisResponse
 } from "../interfaces/PriceAnalysis.interface";
 
 const priceAnalysisService = new PriceAnalysisService(HttpClient);
@@ -84,6 +85,24 @@ export const usePriceAnalysis = () => {
     }
   };
 
+  const createPriceAnalysisFromRetaceo = async (retaceoId: number) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const analysis = await priceAnalysisService.createFromRetaceo(retaceoId);
+      setPriceAnalyses((prev) => [...prev, analysis]);
+      setPriceAnalysis(analysis);
+      setPriceAnalysisDetails(analysis.price_analysis_details || []);
+      return analysis;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Error al generar el análisis desde el retaceo";
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const updatePriceAnalysis = async (id: number, data: UpdatePriceAnalysisRequest) => {
     setLoading(true);
     setError(null);
@@ -116,6 +135,26 @@ export const usePriceAnalysis = () => {
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Error al eliminar el análisis";
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const applyPriceAnalysis = async (id: number): Promise<ApplyPriceAnalysisResponse> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await priceAnalysisService.applyAnalysis(id);
+      setPriceAnalyses((prev) =>
+        prev.map((analysis) => (analysis.id === id ? response.analysis : analysis))
+      );
+      setPriceAnalysis(response.analysis);
+      setPriceAnalysisDetails(response.analysis.price_analysis_details || []);
+      return response;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Error al aplicar el análisis";
       setError(errorMessage);
       throw err;
     } finally {
@@ -219,8 +258,10 @@ export const usePriceAnalysis = () => {
     getPriceAnalysisById,
     getPriceAnalysesByRetaceoId,
     createPriceAnalysis,
+  createPriceAnalysisFromRetaceo,
     updatePriceAnalysis,
     deletePriceAnalysis,
+  applyPriceAnalysis,
     createPriceAnalysisDetail,
     getPriceAnalysisDetails,
     getPriceAnalysisDetailById,

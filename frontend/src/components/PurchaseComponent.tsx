@@ -146,6 +146,10 @@ export const PurchaseComponent = () => {
     }
   };
 
+  const handleGoToRetaceo = (purchaseId: number) => {
+    window.location.href = `/retaceos?purchase_id=${purchaseId}`;
+  };
+
   const handleDeletePurchase = async (id: number) => {
     try {
       await deletePurchase(id);
@@ -340,6 +344,14 @@ export const PurchaseComponent = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => purchase.id && handleGoToRetaceo(purchase.id)}
+                          className="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white text-xs font-medium rounded-lg transition-all duration-200 flex items-center gap-1"
+                          title="Crear/Ver Retaceo"
+                        >
+                          <Package size={14} />
+                          Retaceo
+                        </button>
                         <button
                           onClick={() => handleEditPurchase(purchase)}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
