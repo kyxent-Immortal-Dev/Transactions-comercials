@@ -4,6 +4,8 @@
 
 ¡Bienvenido al proyecto **Transactions-comercials**\! Este es un sistema completo para la gestión de transacciones, construido con **Bun**, **Prisma**, **TypeScript** y **PostgreSQL**. Sigue esta guía para ponerlo en marcha en tu máquina.
 
+> 📚 **¿Quieres conocer todas las tecnologías utilizadas?** Consulta el archivo **[TECHNOLOGIES.md](TECHNOLOGIES.md)** para una documentación completa del stack tecnológico.
+
 -----
 
 ## 🛠️ Requisitos
